@@ -10,6 +10,48 @@ import { contrast } from '../colors';
 import { Values } from '../ownership';
 
 suite('GNOME wallpaper smoke test', () => {
+    test('rule cycling follows the active Wallpaper Paste appearance despite the opposite saved setting', async function () {
+        if (process.env.WALLPAPER_PASTE_GNOME_SMOKE !== '1') { this.skip(); }
+        const config = () => vscode.workspace.getConfiguration();
+        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
+        const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
+        let preview: Thenable<unknown> | undefined;
+        const wait = async (predicate: () => boolean) => {
+            const deadline = Date.now() + 10000;
+            while (!predicate() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
+            assert.ok(predicate());
+        };
+        try {
+            await config().update('wallpaper-paste.autoSync', false, vscode.ConfigurationTarget.Global);
+            for (const mode of ['light', 'dark']) {
+                for (const section of customizationSections) { await config().update(section, undefined, vscode.ConfigurationTarget.Global); }
+                await config().update('wallpaper-paste.appearance', mode === 'light' ? 'dark' : 'light', vscode.ConfigurationTarget.Global);
+                await config().update('wallpaper-paste.harmony', 'analogous', vscode.ConfigurationTarget.Global);
+                const theme = `Wallpaper Paste ${mode === 'light' ? 'Light' : 'Dark'}`;
+                await config().update('workbench.colorTheme', theme, vscode.ConfigurationTarget.Global);
+                preview = vscode.commands.executeCommand('wallpaper-paste.preview');
+                const tokens = () => config().inspect<Values>('editor.tokenColorCustomizations')?.globalValue?.[`[${theme}]`];
+                await wait(() => !!tokens());
+                assert.equal(config().get('workbench.colorTheme'), theme);
+                for (let step = 0; step < 2; step++) {
+                    const before = JSON.stringify(tokens());
+                    await vscode.commands.executeCommand('workbench.action.quickOpenSelectNext');
+                    await wait(() => JSON.stringify(tokens()) !== before);
+                    assert.equal(config().get('workbench.colorTheme'), theme, `${mode} stays selected while changing rules`);
+                }
+                await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
+                await preview; preview = undefined;
+                assert.equal(config().get('wallpaper-paste.harmony'), 'triad');
+                assert.equal(config().get('wallpaper-paste.appearance'), mode);
+                assert.equal(config().get('workbench.colorTheme'), theme);
+                await vscode.commands.executeCommand('wallpaper-paste.restore');
+            }
+        } finally {
+            if (preview) { await vscode.commands.executeCommand('workbench.action.closeQuickOpen'); await preview; }
+            await vscode.commands.executeCommand('wallpaper-paste.restore');
+            for (const key of keys) { await config().update(key, originals[key], vscode.ConfigurationTarget.Global); }
+        }
+    });
     test('real wallpaper sync, language editors, light/dark controls, and palette report', async function () {
         if (process.env.WALLPAPER_PASTE_GNOME_SMOKE !== '1') { this.skip(); }
         const config = vscode.workspace.getConfiguration();

@@ -7,6 +7,7 @@ import { isPrimaryChoice } from './primary';
 import { createPreviewPicker, PreviewPicker } from './preview';
 import { selectProvider, wallpaperPath } from './providers';
 import { reportHtml } from './report';
+import { themeNames } from './theme';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const output = vscode.window.createOutputChannel('Wallpaper Paste');
@@ -110,8 +111,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             prepare: async signal => {
                 source = await read();
                 if (signal.aborted) { throw new Cancelled(); }
+                // Selecting a contributed theme does not update our appearance preference.
+                // Keep rule/primary previews in the currently visible mode until explicitly toggled.
+                const appearance = application.active === themeNames.light ? 'light' : application.active === themeNames.dark ? 'dark' : source.appearance;
                 variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal, source.primaries);
-                return { variants, harmony: source.harmony, appearance: source.appearance, primaries: source.primaries };
+                return { variants, harmony: source.harmony, appearance, primaries: source.primaries };
             },
         });
         preview = picker; previewOpening = false;

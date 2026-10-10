@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.4
+
+- Start previews from the active Wallpaper Paste Light/Dark theme, preserving its appearance while cycling rules even when the saved preference differs.
+
 ## 0.0.3
 
 - Cycle primary surface/accent colors from extracted wallpaper swatches and the selected harmony.
