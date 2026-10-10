@@ -1,0 +1,36 @@
+export const harmonies = ['analogous', 'monochromatic', 'triad', 'complementary', 'compound', 'shades'] as const;
+export type Harmony = typeof harmonies[number];
+export type Appearance = 'dark' | 'light';
+export interface Swatch { hex: string; weight: number }
+export interface Wallpaper { uri: string; appearance: Appearance; provider: string }
+export interface Disposable { dispose(): void }
+export interface WallpaperProvider {
+    readonly id: string;
+    available(): Promise<boolean>;
+    current(): Promise<Wallpaper>;
+    watch?(changed: () => void, failed: (error: Error) => void): Disposable;
+}
+export interface ContrastPolicy {
+    readonly id: string;
+    text: number;
+    comment: number;
+    secondary: number;
+    indicator: number;
+}
+export const balancedPolicy: ContrastPolicy = { id: 'balanced', text: 4.5, comment: 4.5, secondary: 4.5, indicator: 3 };
+export interface ContrastCheck {
+    role: string; foreground: string; background: string; ratio: number; minimum: number;
+}
+export interface Role {
+    name: string; original: string; adjusted: string; backgrounds: string[]; minimum: number;
+}
+export interface TextMateRule { scope: string[]; settings: { foreground: string } }
+export interface GeneratedTheme {
+    appearance: Appearance;
+    colors: Record<string, string>;
+    textMateRules: TextMateRule[];
+    semanticRules: Record<string, string>;
+    roles: Role[];
+    checks: ContrastCheck[];
+}
+export interface PaletteResult { swatches: Swatch[]; palette: string[]; neutral: boolean; theme: GeneratedTheme }
