@@ -6,6 +6,7 @@ Generate a readable VS Code theme from your Fedora/GNOME desktop wallpaper. The 
 
 1. Install the VSIX through **Extensions: Install from VSIX…**, or open this directory in VS Code and press **F5**.
 2. Run **Wallpaper Paste: Sync Theme from Wallpaper** from the Command Palette.
+   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
 3. Run **Wallpaper Paste: Show Palette and Contrast Report** to inspect the wallpaper's colors, generated harmony, readability adjustments, and contrast measurements. This command does not apply a theme.
 4. Optionally enable `wallpaper-paste.autoSync` in Settings. Monitoring applies changes while a Wallpaper Paste theme is selected. Choosing another theme pauses application.
 5. Run **Wallpaper Paste: Restore Previous Theme** to turn off auto-sync and restore settings from before the first sync. Later user edits are preserved.
@@ -49,6 +50,8 @@ Recipes use OKLCH hue angles and lightness/chroma. Out-of-gamut colors reduce ch
 | Compound | Seed hue, ±30° neighbors, and +150°/+210° split complements |
 | Shades | Seed hue/chroma with descending lightness |
 
+Light themes use the wallpaper's weighted brightness and colorfulness to set surface lightness and tint, so colorful wallpapers produce visible differences in the editor, sidebar, and fields. Grayscale wallpapers remain neutral. The preview prepares all twelve rule/appearance combinations in a worker after one extraction; cycling reuses these results without decoding the image again. Automatic syncing waits while the picker is open. Interrupted previews are restored when the extension next activates.
+
 ## Readability and the report
 
 The balanced policy requires a WCAG contrast ratio of at least **4.5:1** for generated primary text, comments, secondary text, syntax categories, button labels, and input text against the controlled surfaces. Essential focus indicators target **3:1**. Readability is checked again on final 8-bit sRGB hex values after adjustment. Comments remain less prominent where possible while meeting the text minimum.
@@ -75,7 +78,7 @@ VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 xvfb-run -a env VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 ```
 
-Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.1.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
+Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.2.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
 
 ## Extension points
 

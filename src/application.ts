@@ -1,15 +1,76 @@
 import * as vscode from 'vscode';
-import { GeneratedTheme } from './model';
+import { Appearance, GeneratedTheme, Harmony } from './model';
 import { Ledger, Values, equal, mergeOwned, restoreOwned } from './ownership';
 import { themeNames } from './theme';
 
 const ledgerKey = 'themeOwnership.v1';
+const previewKey = 'themePreview.v1';
+interface PreviewJournal {
+    ledgerBefore?: Ledger;
+    previousTheme?: string;
+    selectedThemes?: string[];
+    sections: Ledger['sections'];
+    settings: Record<string, { before?: unknown; written: unknown }>;
+}
 export const customizationSections = ['workbench.colorCustomizations', 'editor.tokenColorCustomizations', 'editor.semanticTokenColorCustomizations'];
 export class ThemeApplication {
     constructor(private readonly state: vscode.Memento) {}
     get ledger(): Ledger | undefined { return this.state.get<Ledger>(ledgerKey); }
     get active(): string { return vscode.workspace.getConfiguration('workbench').get<string>('colorTheme', '') ; }
     get ownedThemeActive(): boolean { return Object.values(themeNames).includes(this.active); }
+    async beginPreview(): Promise<void> {
+        await this.recoverPreview();
+        await this.state.update(previewKey, {
+            ledgerBefore: this.ledger,
+            previousTheme: vscode.workspace.getConfiguration().inspect<string>('workbench.colorTheme')?.globalValue,
+            sections: {}, settings: {},
+        } satisfies PreviewJournal);
+    }
+    private async trackPreview(section: string, current: Values | undefined, block: string, generated: Values): Promise<void> {
+        const saved = this.state.get<PreviewJournal>(previewKey);
+        if (!saved) { return; }
+        const journal: PreviewJournal = JSON.parse(JSON.stringify(saved));
+        const entry = journal.sections[section] ?? { originallyAbsent: current === undefined, blocks: {} };
+        entry.blocks[block] = mergeOwned(current, block, generated, entry.blocks[block]).ledger;
+        journal.sections[section] = entry;
+        await this.state.update(previewKey, journal);
+    }
+    async recoverPreview(): Promise<void> { if (this.state.get(previewKey)) { await this.finishPreview(false); } }
+    async finishPreview(keep: boolean): Promise<void> {
+        const journal = this.state.get<PreviewJournal>(previewKey);
+        if (!journal) { return; }
+        if (!keep) {
+            for (const [section, entry] of Object.entries(journal.sections)) {
+                const config = vscode.workspace.getConfiguration();
+                let current = config.inspect<Values>(section)?.globalValue;
+                for (const [block, ownership] of Object.entries(entry.blocks)) { current = restoreOwned(current, block, ownership); }
+                await config.update(section, entry.originallyAbsent && !Object.keys(current ?? {}).length ? undefined : current, vscode.ConfigurationTarget.Global);
+            }
+            const config = vscode.workspace.getConfiguration();
+            for (const [key, entry] of Object.entries(journal.settings)) {
+                if (equal(vscode.workspace.getConfiguration().inspect(key)?.globalValue, entry.written)) {
+                    await config.update(key, entry.before, vscode.ConfigurationTarget.Global);
+                }
+            }
+            if (journal.selectedThemes?.includes(this.active)) { await config.update('workbench.colorTheme', journal.previousTheme, vscode.ConfigurationTarget.Global); }
+            await this.state.update(ledgerKey, journal.ledgerBefore);
+        }
+        await this.state.update(previewKey, undefined);
+    }
+    async commitPreview(harmony: Harmony, appearance: Appearance): Promise<void> {
+        try {
+            for (const [key, written] of Object.entries({ 'wallpaper-paste.harmony': harmony, 'wallpaper-paste.appearance': appearance })) {
+                const config = vscode.workspace.getConfiguration();
+                const saved = this.state.get<PreviewJournal>(previewKey);
+                if (!saved) { throw new Error('Preview session is no longer active'); }
+                const journal: PreviewJournal = JSON.parse(JSON.stringify(saved));
+                journal.settings[key] = { before: config.inspect(key)?.globalValue, written };
+                await this.state.update(previewKey, journal);
+                await config.update(key, written, vscode.ConfigurationTarget.Global);
+            }
+            await this.finishPreview(true);
+        } catch (error) { await this.finishPreview(false); throw error; }
+    }
     async apply(theme: GeneratedTheme, maySelect: () => boolean = () => true): Promise<boolean> {
         const config = vscode.workspace.getConfiguration();
         const originalLedger = this.ledger;
@@ -22,25 +83,29 @@ export class ThemeApplication {
         ledger.activeTheme = name;
         const generated: Values[] = [theme.colors, { textMateRules: theme.textMateRules }, { enabled: true, rules: theme.semanticRules }];
         try {
-        for (let i = 0; i < customizationSections.length; i++) {
-            const section = customizationSections[i];
-            const current = config.inspect<Values>(section)?.globalValue;
-            const sectionLedger = ledger.sections[section] ?? { originallyAbsent: current === undefined, blocks: {} };
-            const merged = mergeOwned(current, block, generated[i], sectionLedger.blocks[block]);
-            sectionLedger.blocks[block] = merged.ledger;
-            ledger.sections[section] = sectionLedger;
-            // Journal before writing so restart/crash restoration can identify even a partial application.
-            await this.state.update(ledgerKey, ledger);
-            rollback.push({ section, before: current, written: merged.value });
-            await config.update(section, merged.value, vscode.ConfigurationTarget.Global);
-        }
-        // Configuration writes yield to the UI. A user can select another theme during those awaits.
-        if (!maySelect()) { return false; }
-        if (this.active !== name) {
-            rollback.push({ section: 'workbench.colorTheme', before: config.inspect('workbench.colorTheme')?.globalValue, written: name });
-            await config.update('workbench.colorTheme', name, vscode.ConfigurationTarget.Global);
-        }
-        return true;
+            for (let i = 0; i < customizationSections.length; i++) {
+                const section = customizationSections[i];
+                const current = config.inspect<Values>(section)?.globalValue;
+                const sectionLedger = ledger.sections[section] ?? { originallyAbsent: current === undefined, blocks: {} };
+                const merged = mergeOwned(current, block, generated[i], sectionLedger.blocks[block]);
+                sectionLedger.blocks[block] = merged.ledger;
+                ledger.sections[section] = sectionLedger;
+                // Journal before writing so restart/crash restoration can identify even a partial application.
+                await this.state.update(ledgerKey, ledger);
+                await this.trackPreview(section, current, block, generated[i]);
+                rollback.push({ section, before: current, written: merged.value });
+                await config.update(section, merged.value, vscode.ConfigurationTarget.Global);
+            }
+            // Configuration writes yield to the UI. A user can select another theme during those awaits.
+            if (!maySelect()) { return false; }
+            const preview = this.state.get<PreviewJournal>(previewKey);
+            if (preview) { await this.state.update(previewKey, { ...preview, selectedThemes: [...new Set([...(preview.selectedThemes ?? []), name])] }); }
+            if (!maySelect()) { return false; }
+            if (this.active !== name) {
+                rollback.push({ section: 'workbench.colorTheme', before: config.inspect('workbench.colorTheme')?.globalValue, written: name });
+                await config.update('workbench.colorTheme', name, vscode.ConfigurationTarget.Global);
+            }
+            return true;
         } catch (error) {
             let recovered = true;
             for (const entry of rollback.reverse()) {
@@ -56,6 +121,7 @@ export class ThemeApplication {
         }
     }
     async restore(): Promise<void> {
+        await this.recoverPreview();
         const ledger = this.ledger;
         if (!ledger) { return; }
         const config = vscode.workspace.getConfiguration();

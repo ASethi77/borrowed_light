@@ -34,3 +34,11 @@ export interface GeneratedTheme {
     checks: ContrastCheck[];
 }
 export interface PaletteResult { swatches: Swatch[]; palette: string[]; neutral: boolean; theme: GeneratedTheme }
+export type PreviewVariants = Record<Harmony, Record<Appearance, PaletteResult>>;
+export interface PipelineInput {
+    path?: string;
+    swatches?: Swatch[];
+    harmony?: Harmony;
+    appearance?: Appearance;
+    previews?: boolean;
+}

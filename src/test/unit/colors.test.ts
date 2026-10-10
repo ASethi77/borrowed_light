@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { contrast, extract, harmonize, lch, matrix, readable } from '../../colors';
 import { Appearance, harmonies } from '../../model';
 import { generateTheme } from '../../theme';
+import { generateVariant } from '../../variants';
 
 const swatches = [{ hex: '#248abb', weight: 0.7 }, { hex: '#dc7b4d', weight: 0.3 }];
 test('WCAG reference ratios, symmetry, and diagonal', () => {
@@ -70,4 +71,20 @@ test('contrast uses quantized sRGB and fails impossible multi-surface assignment
     const adjusted = readable('#777777', ['#ffffff'], 4.5);
     assert.ok(contrast(adjusted, '#ffffff') >= 4.5);
     assert.throws(() => readable('#777777', ['#000000', '#ffffff'], 7), /Cannot meet/);
+});
+test('light surfaces reflect wallpaper hue, brightness, and colorfulness while retaining contrast', () => {
+    const sources = ['#bb3322', '#2288bb', '#33aa44', '#112233', '#aaccff', '#888888'];
+    const themes = sources.map(hex => generateVariant([{ hex, weight: 1 }], 'analogous', 'light').theme);
+    assert.equal(new Set(themes.map(theme => theme.colors['editor.background'])).size, sources.length);
+    assert.equal(new Set(themes.map(theme => theme.colors['sideBar.background'])).size, sources.length);
+    assert.ok(lch(themes[3].colors['editor.background']).l < lch(themes[4].colors['editor.background']).l);
+    assert.ok(lch(themes[5].colors['editor.background']).c < 0.001);
+    for (const hex of sources) {
+        for (const harmony of harmonies) {
+            for (const appearance of ['light', 'dark'] as Appearance[]) {
+                const theme = generateVariant([{ hex, weight: 1 }], harmony, appearance).theme;
+                theme.checks.forEach(check => assert.ok(check.ratio >= check.minimum, `${hex}/${harmony}/${appearance}/${check.role}`));
+            }
+        }
+    }
 });

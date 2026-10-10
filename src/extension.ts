@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { stat } from 'node:fs/promises';
 import { ThemeApplication } from './application';
-import { Appearance, harmonies, Harmony, PaletteResult, Wallpaper } from './model';
-import { Cancelled, runPipeline } from './pipeline';
+import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper } from './model';
+import { Cancelled, runPipeline, runPreviews } from './pipeline';
+import { createPreviewPicker, PreviewPicker } from './preview';
 import { selectProvider, wallpaperPath } from './providers';
 import { reportHtml } from './report';
 
@@ -10,6 +11,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const output = vscode.window.createOutputChannel('Wallpaper Paste');
     const provider = await selectProvider();
     const application = new ThemeApplication(context.globalState);
+    try { await application.recoverPreview(); } catch (value) { output.appendLine(`Could not restore an interrupted preview: ${String(value)}`); }
     const workerPath = context.asAbsolutePath('dist/palette-worker.js');
     let disposed = false, revision = 0, signature = '', lastError = '';
     let cached: { signature: string; result: PaletteResult } | undefined;
@@ -18,6 +20,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let timer: ReturnType<typeof setInterval> | undefined;
     let debounce: ReturnType<typeof setTimeout> | undefined;
     let writes = Promise.resolve();
+    let preview: PreviewPicker | undefined;
+    let previewOpening = false;
     const reportWorkers = new Set<AbortController>();
     const settings = () => vscode.workspace.getConfiguration('wallpaper-paste');
     const serialized = (action: () => Promise<void>): Promise<void> => {
@@ -33,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         lastError = message;
         if (manual) { void vscode.window.showErrorMessage(`Wallpaper Paste: ${message}`); }
     };
-    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string }> => {
+    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string }> => {
         const config = settings();
         const harmony = config.get<Harmony>('harmony', 'analogous');
         if (!harmonies.includes(harmony)) { throw new Error('Unknown harmony setting'); }
@@ -42,10 +46,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const wallpaper = await provider.current();
         const appearance = requested === 'desktop' ? wallpaper.appearance : requested as Appearance;
         const path = wallpaperPath(wallpaper.uri), metadata = await stat(path);
-        return { wallpaper, path, harmony, appearance, signature: JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino, harmony, appearance]) };
+        const sourceSignature = JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino]);
+        return { wallpaper, path, harmony, appearance, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance]) };
     };
     const sync = async (manual: boolean): Promise<void> => {
-        if (disposed || (!manual && (!settings().get<boolean>('autoSync') || !application.ownedThemeActive))) { return; }
+        if (disposed || preview || previewOpening || (!manual && (!settings().get<boolean>('autoSync') || !application.ownedThemeActive))) { return; }
         cancel();
         const currentRevision = revision;
         abort = new AbortController();
@@ -87,9 +92,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         timer = setInterval(schedule, 30000);
         schedule();
     };
+    const openPreview = async () => {
+        if (previewOpening || disposed) { return; }
+        previewOpening = true;
+        await preview?.cancel();
+        cancel();
+        await writes;
+        if (disposed) { previewOpening = false; return; }
+        let source: Awaited<ReturnType<typeof read>> | undefined;
+        let variants: PreviewVariants | undefined;
+        const picker = createPreviewPicker({
+            application, enqueue: serialized, error: value => error(value, true),
+            prepare: async signal => {
+                source = await read();
+                if (signal.aborted) { throw new Cancelled(); }
+                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal);
+                return { variants, harmony: source.harmony, appearance: source.appearance };
+            },
+        });
+        preview = picker; previewOpening = false;
+        const choice = await picker.closed;
+        if (preview === picker) { preview = undefined; }
+        if (disposed) { return; }
+        if (choice && source && variants) {
+            signature = JSON.stringify([source.sourceSignature, choice.harmony, choice.appearance]);
+            cached = { signature, result: variants[choice.harmony][choice.appearance] };
+            output.appendLine(`Kept ${choice.appearance} ${choice.harmony} wallpaper preview`);
+        }
+        configureMonitoring();
+    };
+    const previewStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 10);
+    previewStatus.text = '$(symbol-color) Wallpaper';
+    previewStatus.tooltip = 'Preview wallpaper color rules and light/dark appearances';
+    previewStatus.command = 'wallpaper-paste.preview';
+    previewStatus.show();
     context.subscriptions.push(output,
-        vscode.commands.registerCommand('wallpaper-paste.sync', () => sync(true)),
+        previewStatus,
+        vscode.commands.registerCommand('wallpaper-paste.preview', openPreview),
+        vscode.commands.registerCommand('wallpaper-paste.sync', async () => { await preview?.cancel(); await sync(true); }),
         vscode.commands.registerCommand('wallpaper-paste.report', async () => {
+            await preview?.cancel();
             const reportAbort = new AbortController();
             reportWorkers.add(reportAbort);
             try {
@@ -104,6 +146,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             finally { reportWorkers.delete(reportAbort); }
         }),
         vscode.commands.registerCommand('wallpaper-paste.restore', async () => {
+            await preview?.cancel();
             cancel(); stop();
             try {
                 await serialized(async () => {
@@ -117,11 +160,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('wallpaper-paste')) { cancel(); signature = ''; configureMonitoring(); }
             else if (event.affectsConfiguration('workbench.colorTheme')) {
-                if (!application.ownedThemeActive) { cancel(); }
+                if (!application.ownedThemeActive) { cancel(); void preview?.cancel(); }
                 else { schedule(); }
             }
         }),
-        { dispose: () => { disposed = true; cancel(); stop(); reportWorkers.forEach(worker => worker.abort()); } },
+        { dispose: () => { disposed = true; cancel(); stop(); reportWorkers.forEach(worker => worker.abort()); void preview?.cancel(); } },
     );
     configureMonitoring();
 }

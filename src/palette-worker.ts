@@ -2,9 +2,9 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { open } from 'node:fs/promises';
 import * as jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
-import { extract, harmonize } from './colors';
-import { generateTheme } from './theme';
-import { Appearance, Harmony } from './model';
+import { extract } from './colors';
+import { PipelineInput } from './model';
+import { generateVariant, generateVariants } from './variants';
 
 export const maxBytes = 64 * 1024 * 1024;
 export const maxPixels = 32_000_000;
@@ -40,14 +40,16 @@ export async function decodeImage(path: string): Promise<{ data: Uint8Array; wid
 
 if (parentPort) {
     const port = parentPort;
-    const input = workerData as { path: string; harmony: Harmony; appearance: Appearance };
+    const input = workerData as PipelineInput;
     void (async () => {
         try {
-            const image = await decodeImage(input.path);
-            const swatches = extract(image.data, image.width, image.height);
-            const { palette, neutral } = harmonize(swatches, input.harmony);
-            const theme = generateTheme(palette, input.appearance);
-            port.postMessage({ result: { swatches, palette, neutral, theme } });
+            let swatches = input.swatches;
+            if (!swatches) {
+                if (!input.path) { throw new Error('No wallpaper source'); }
+                const image = await decodeImage(input.path);
+                swatches = extract(image.data, image.width, image.height);
+            }
+            port.postMessage({ result: input.previews ? generateVariants(swatches) : generateVariant(swatches, input.harmony!, input.appearance!) });
         } catch (error) { port.postMessage({ error: error instanceof Error ? error.message : String(error) }); }
         finally { port.close(); }
     })();

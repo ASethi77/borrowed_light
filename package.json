@@ -2,7 +2,7 @@
   "name": "wallpaper-paste",
   "displayName": "Wallpaper Paste",
   "description": "Generate a readable VS Code theme from your GNOME desktop wallpaper",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.128.0"
   },
@@ -27,6 +27,10 @@
       {
         "command": "wallpaper-paste.restore",
         "title": "Wallpaper Paste: Restore Previous Theme"
+      },
+      {
+        "command": "wallpaper-paste.preview",
+        "title": "Wallpaper Paste: Preview Color Schemes"
       }
     ],
     "themes": [
@@ -92,7 +96,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.1.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.2.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

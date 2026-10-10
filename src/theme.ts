@@ -1,17 +1,23 @@
 import { color, contrast, lch, readable } from './colors';
-import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, TextMateRule } from './model';
+import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule } from './model';
 
 export const themeNames = { dark: 'Wallpaper Paste Dark', light: 'Wallpaper Paste Light' };
-export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy): GeneratedTheme {
+export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = []): GeneratedTheme {
     if (palette.length !== 5) { throw new Error('Expected five harmony colors'); }
     const seed = lch(palette[2]);
     const dark = appearance === 'dark';
-    const tint = Math.min(seed.c, 0.014);
-    const bg = color(dark ? 0.15 : 0.97, tint, seed.h);
-    const panel = color(dark ? 0.19 : 0.93, tint, seed.h);
-    const field = color(dark ? 0.22 : 0.90, tint, seed.h);
-    const selection = color(dark ? 0.29 : 0.84, Math.min(seed.c, 0.025), seed.h);
-    const hover = color(dark ? 0.25 : 0.88, tint, seed.h);
+    const total = swatches.reduce((sum, swatch) => sum + swatch.weight, 0);
+    const sourceLightness = total ? swatches.reduce((sum, swatch) => sum + lch(swatch.hex).l * swatch.weight, 0) / total : seed.l;
+    const sourceChroma = total ? swatches.reduce((sum, swatch) => sum + lch(swatch.hex).c * swatch.weight, 0) / total : seed.c;
+    // Near-white, fixed surfaces erased wallpaper differences. Use its brightness and colorfulness
+    // for light surfaces, leaving enough lightness headroom for perceptible, in-gamut hue variation.
+    const lightness = 0.91 + 0.045 * sourceLightness;
+    const tint = dark ? Math.min(seed.c, 0.014) : Math.min(seed.c * 0.55, 0.03 + sourceChroma * 0.35);
+    const bg = color(dark ? 0.15 : lightness, tint, seed.h);
+    const panel = color(dark ? 0.19 : lightness - 0.06, dark ? tint : tint * 1.45, seed.h);
+    const field = color(dark ? 0.22 : lightness - 0.09, dark ? tint : tint * 1.2, seed.h);
+    const selection = color(dark ? 0.29 : lightness - 0.16, Math.min(seed.c, dark ? 0.025 : 0.09), seed.h);
+    const hover = color(dark ? 0.25 : lightness - 0.12, dark ? tint : tint * 1.3, seed.h);
     const all = [bg, panel, field, selection, hover];
     const colors: Record<string, string> = {};
     const roles: Role[] = [];

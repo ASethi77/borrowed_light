@@ -1,13 +1,19 @@
 import { Worker } from 'node:worker_threads';
-import { Appearance, Harmony, PaletteResult } from './model';
+import { Appearance, Harmony, PaletteResult, PipelineInput, PreviewVariants } from './model';
 
 export class Cancelled extends Error { constructor() { super('Generation superseded or stopped'); } }
 export function runPipeline(workerPath: string, path: string, harmony: Harmony, appearance: Appearance, signal?: AbortSignal): Promise<PaletteResult> {
+    return runWorker<PaletteResult>(workerPath, { path, harmony, appearance }, signal);
+}
+export function runPreviews(workerPath: string, source: Pick<PipelineInput, 'path' | 'swatches'>, signal?: AbortSignal): Promise<PreviewVariants> {
+    return runWorker<PreviewVariants>(workerPath, { ...source, previews: true }, signal);
+}
+function runWorker<T>(workerPath: string, input: PipelineInput, signal?: AbortSignal): Promise<T> {
     if (signal?.aborted) { return Promise.reject(new Cancelled()); }
     return new Promise((resolve, reject) => {
-        const worker = new Worker(workerPath, { workerData: { path, harmony, appearance }, resourceLimits: { maxOldGenerationSizeMb: 128 } });
+        const worker = new Worker(workerPath, { workerData: input, resourceLimits: { maxOldGenerationSizeMb: 128 } });
         let settled = false;
-        const finish = (error?: Error, result?: PaletteResult) => {
+        const finish = (error?: Error, result?: T) => {
             if (settled) { return; }
             settled = true;
             clearTimeout(timer);
@@ -20,7 +26,7 @@ export function runPipeline(workerPath: string, path: string, harmony: Harmony, 
         signal?.addEventListener('abort', abort, { once: true });
         worker.on('message', message => {
             if (message.error) { finish(new Error(message.error)); }
-            else if (message.result) { finish(undefined, message.result as PaletteResult); }
+            else if (message.result) { finish(undefined, message.result as T); }
             else { finish(new Error('Invalid palette worker result')); }
         });
         worker.on('error', error => finish(error));

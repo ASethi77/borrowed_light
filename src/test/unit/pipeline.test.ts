@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import * as jpeg from 'jpeg-js';
 import { decodeImage } from '../../palette-worker';
-import { Cancelled, runPipeline } from '../../pipeline';
+import { Cancelled, runPipeline, runPreviews } from '../../pipeline';
 import { harmonies } from '../../model';
 import { reportHtml } from '../../report';
 
@@ -25,6 +25,16 @@ test('JPEG/PNG decode and packaged worker round-trip; paths need no shell escapi
     const result = await runPipeline(resolve('dist/palette-worker.js'), pngPath, harmonies[0], 'dark');
     assert.equal(result.palette.length, 5);
     assert.ok(result.theme.checks.every(check => check.ratio >= check.minimum));
+    const previews = await runPreviews(resolve('dist/palette-worker.js'), { path: pngPath });
+    const reused = await runPreviews(resolve('dist/palette-worker.js'), { swatches: result.swatches });
+    assert.deepEqual(previews, reused);
+    for (const harmony of harmonies) {
+        for (const appearance of ['light', 'dark'] as const) {
+            assert.equal(previews[harmony][appearance].theme.appearance, appearance);
+            assert.deepEqual(previews[harmony][appearance].swatches, result.swatches);
+            assert.ok(previews[harmony][appearance].theme.checks.every(check => check.ratio >= check.minimum));
+        }
+    }
     const html = reportHtml(result, { uri: 'file:///tmp/<script>alert(1)</script>.png', provider: 'test', appearance: 'dark' }, 'analogous', ['<img onerror="bad">']);
     assert.ok(html.includes('&lt;script&gt;'));
     assert.ok(!html.includes('<script>'));
