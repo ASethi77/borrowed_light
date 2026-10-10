@@ -3,10 +3,12 @@ import * as vscode from 'vscode';
 import { ThemeApplication, customizationSections } from '../application';
 import { generateTheme, themeNames } from '../theme';
 import { Values } from '../ownership';
-import { generateVariants } from '../variants';
+import { generateVariant, generateVariants } from '../variants';
 import { createPreviewPicker } from '../preview';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { join } from 'node:path';
+import { runVariant } from '../pipeline';
 
 class Memory implements vscode.Memento {
     private values: Record<string, unknown> = {};
@@ -23,7 +25,7 @@ class Memory implements vscode.Memento {
 const palette = ['#5a8cab','#d79e63','#8eb886','#bd88c7','#bf7272'];
 suite('Wallpaper Paste extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
-    const sections = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.autoSync', 'wallpaper-paste.harmony', 'wallpaper-paste.appearance'];
+    const sections = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.autoSync', 'wallpaper-paste.harmony', 'wallpaper-paste.appearance', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
     let originals: Record<string, unknown>;
     setup(() => {
         originals = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
@@ -134,6 +136,9 @@ suite('Wallpaper Paste extension host', () => {
             await wait(() => app.active === themeNames.light);
             await vscode.commands.executeCommand('workbench.action.quickOpenSelectNext');
             await wait(() => JSON.stringify(colors()) === JSON.stringify(variants.monochromatic.light.theme.colors));
+            picker.cyclePrimary();
+            picker.toggleAppearance();
+            await wait(() => app.active === themeNames.dark);
             if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/picker.png`]);
@@ -168,9 +173,49 @@ suite('Wallpaper Paste extension host', () => {
             await waitFor('triad');
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
-            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark' });
+            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' } });
             assert.equal(config().get('wallpaper-paste.harmony'), 'triad');
             assert.equal(config().get('wallpaper-paste.appearance'), 'dark');
+            assert.deepEqual(errors, []);
+        } finally { await picker.cancel(); await app.restore(); }
+    });
+    test('primary cycling previews wallpaper highlights and remembers separate light/dark choices', async () => {
+        const app = new ThemeApplication(new Memory());
+        const swatches = [{ hex: '#229944', weight: 0.7 }, { hex: '#2266cc', weight: 0.15 }, { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 }];
+        const variants = generateVariants(swatches);
+        let writes = Promise.resolve();
+        const errors: unknown[] = [];
+        const picker = createPreviewPicker({
+            application: app, prepare: async () => ({ variants, harmony: 'analogous', appearance: 'dark' }),
+            enqueue: action => { const next = writes.then(action); writes = next.catch(() => {}); return next; },
+            generate: (swatches, rule, mode, primary, signal) => runVariant(join(__dirname, '../../dist/palette-worker.js'), swatches, rule, mode, primary, signal),
+            error: error => { errors.push(error); },
+        });
+        const waitFor = async (mode: 'light' | 'dark', primary: 'automatic' | 'wallpaper-1' | 'wallpaper-2') => {
+            const expected = generateVariant(swatches, 'analogous', mode, primary).theme.colors;
+            const matches = () => app.active === themeNames[mode] && JSON.stringify(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`]) === JSON.stringify(expected);
+            const deadline = Date.now() + 10000;
+            while (!matches() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
+            assert.ok(matches(), `${mode}/${primary}`);
+        };
+        try {
+            await waitFor('dark', 'automatic');
+            picker.cyclePrimary(); picker.cyclePrimary();
+            await waitFor('dark', 'wallpaper-2');
+            picker.toggleAppearance();
+            await waitFor('light', 'automatic');
+            picker.cyclePrimary();
+            await waitFor('light', 'wallpaper-1');
+            picker.toggleAppearance();
+            await waitFor('dark', 'wallpaper-2');
+            if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/primary-picker.png`]);
+            }
+            await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
+            assert.deepEqual((await picker.closed)?.primaries, { dark: 'wallpaper-2', light: 'wallpaper-1' });
+            assert.equal(config().get('wallpaper-paste.primaryDark'), 'wallpaper-2');
+            assert.equal(config().get('wallpaper-paste.primaryLight'), 'wallpaper-1');
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); }
     });

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { stat } from 'node:fs/promises';
 import { ThemeApplication } from './application';
-import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper } from './model';
-import { Cancelled, runPipeline, runPreviews } from './pipeline';
+import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper, PrimaryChoices } from './model';
+import { Cancelled, runPipeline, runPreviews, runVariant } from './pipeline';
+import { isPrimaryChoice } from './primary';
 import { createPreviewPicker, PreviewPicker } from './preview';
 import { selectProvider, wallpaperPath } from './providers';
 import { reportHtml } from './report';
@@ -37,17 +38,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         lastError = message;
         if (manual) { void vscode.window.showErrorMessage(`Wallpaper Paste: ${message}`); }
     };
-    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string }> => {
+    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices }> => {
         const config = settings();
         const harmony = config.get<Harmony>('harmony', 'analogous');
         if (!harmonies.includes(harmony)) { throw new Error('Unknown harmony setting'); }
+        const primaries: PrimaryChoices = { dark: config.get('primaryDark', 'automatic'), light: config.get('primaryLight', 'automatic') };
+        if (!isPrimaryChoice(primaries.dark) || !isPrimaryChoice(primaries.light)) { throw new Error('Unknown primary color setting'); }
         const requested = config.get<string>('appearance', 'dark');
         if (!['dark', 'light', 'desktop'].includes(requested)) { throw new Error('Unknown appearance setting'); }
         const wallpaper = await provider.current();
         const appearance = requested === 'desktop' ? wallpaper.appearance : requested as Appearance;
         const path = wallpaperPath(wallpaper.uri), metadata = await stat(path);
         const sourceSignature = JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino]);
-        return { wallpaper, path, harmony, appearance, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance]) };
+        return { wallpaper, path, harmony, appearance, primaries, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance, primaries]) };
     };
     const sync = async (manual: boolean): Promise<void> => {
         if (disposed || preview || previewOpening || (!manual && (!settings().get<boolean>('autoSync') || !application.ownedThemeActive))) { return; }
@@ -59,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const source = await read();
             if (currentRevision !== revision || disposed) { return; }
             if (!manual && source.signature === signature) { return; }
-            const result = await runPipeline(workerPath, source.path, source.harmony, source.appearance, signal);
+            const result = await runPipeline(workerPath, source.path, source.harmony, source.appearance, signal, source.primaries[source.appearance]);
             if (result.theme.checks.some(check => check.ratio < check.minimum)) { throw new Error('Generated theme failed its contrast checks'); }
             if (currentRevision === revision) { cached = { signature: source.signature, result }; }
             await serialized(async () => {
@@ -103,11 +106,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         let variants: PreviewVariants | undefined;
         const picker = createPreviewPicker({
             application, enqueue: serialized, error: value => error(value, true),
+            generate: (swatches, rule, mode, primary, signal) => runVariant(workerPath, swatches, rule, mode, primary, signal),
             prepare: async signal => {
                 source = await read();
                 if (signal.aborted) { throw new Cancelled(); }
-                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal);
-                return { variants, harmony: source.harmony, appearance: source.appearance };
+                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal, source.primaries);
+                return { variants, harmony: source.harmony, appearance: source.appearance, primaries: source.primaries };
             },
         });
         preview = picker; previewOpening = false;
@@ -115,8 +119,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (preview === picker) { preview = undefined; }
         if (disposed) { return; }
         if (choice && source && variants) {
-            signature = JSON.stringify([source.sourceSignature, choice.harmony, choice.appearance]);
-            cached = { signature, result: variants[choice.harmony][choice.appearance] };
+            signature = ''; cached = undefined;
             output.appendLine(`Kept ${choice.appearance} ${choice.harmony} wallpaper preview`);
         }
         configureMonitoring();
@@ -136,7 +139,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             reportWorkers.add(reportAbort);
             try {
                 const source = await read();
-                const result = cached?.signature === source.signature ? cached.result : await runPipeline(workerPath, source.path, source.harmony, source.appearance, reportAbort.signal);
+                const result = cached?.signature === source.signature ? cached.result : await runPipeline(workerPath, source.path, source.harmony, source.appearance, reportAbort.signal, source.primaries[source.appearance]);
                 if (disposed) { return; }
                 cached = { signature: source.signature, result };
                 const panel = vscode.window.createWebviewPanel('wallpaperPasteReport', 'Wallpaper Palette & Contrast', vscode.ViewColumn.Beside, { enableScripts: false, localResourceRoots: [] });

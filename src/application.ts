@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Appearance, GeneratedTheme, Harmony } from './model';
+import { Appearance, GeneratedTheme, Harmony, PrimaryChoices } from './model';
 import { Ledger, Values, equal, mergeOwned, restoreOwned } from './ownership';
 import { themeNames } from './theme';
 
@@ -57,9 +57,9 @@ export class ThemeApplication {
         }
         await this.state.update(previewKey, undefined);
     }
-    async commitPreview(harmony: Harmony, appearance: Appearance): Promise<void> {
+    async commitPreview(harmony: Harmony, appearance: Appearance, primaries?: PrimaryChoices): Promise<void> {
         try {
-            for (const [key, written] of Object.entries({ 'wallpaper-paste.harmony': harmony, 'wallpaper-paste.appearance': appearance })) {
+            for (const [key, written] of Object.entries({ 'wallpaper-paste.harmony': harmony, 'wallpaper-paste.appearance': appearance, ...(primaries ? { 'wallpaper-paste.primaryDark': primaries.dark, 'wallpaper-paste.primaryLight': primaries.light } : {}) })) {
                 const config = vscode.workspace.getConfiguration();
                 const saved = this.state.get<PreviewJournal>(previewKey);
                 if (!saved) { throw new Error('Preview session is no longer active'); }

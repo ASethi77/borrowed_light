@@ -49,7 +49,7 @@ if (parentPort) {
                 const image = await decodeImage(input.path);
                 swatches = extract(image.data, image.width, image.height);
             }
-            port.postMessage({ result: input.previews ? generateVariants(swatches) : generateVariant(swatches, input.harmony!, input.appearance!) });
+            port.postMessage({ result: input.previews ? generateVariants(swatches, input.primaries) : generateVariant(swatches, input.harmony!, input.appearance!, input.primary) });
         } catch (error) { port.postMessage({ error: error instanceof Error ? error.message : String(error) }); }
         finally { port.close(); }
     })();

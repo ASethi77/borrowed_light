@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.3
+
+- Cycle primary surface/accent colors from extracted wallpaper swatches and the selected harmony.
+- Remember independent primary colors for light and dark modes.
+- Generate and cache primary previews without decoding the wallpaper again.
+- Show the selected primary source and hex value in the picker and contrast report.
+
 ## 0.0.2
 
 - Light-theme surfaces respond to wallpaper brightness, colorfulness, and hue.

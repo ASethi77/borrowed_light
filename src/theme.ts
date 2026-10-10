@@ -2,9 +2,9 @@ import { color, contrast, lch, readable } from './colors';
 import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule } from './model';
 
 export const themeNames = { dark: 'Wallpaper Paste Dark', light: 'Wallpaper Paste Light' };
-export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = []): GeneratedTheme {
+export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: string = palette[2]): GeneratedTheme {
     if (palette.length !== 5) { throw new Error('Expected five harmony colors'); }
-    const seed = lch(palette[2]);
+    const seed = lch(primary);
     const dark = appearance === 'dark';
     const total = swatches.reduce((sum, swatch) => sum + swatch.weight, 0);
     const sourceLightness = total ? swatches.reduce((sum, swatch) => sum + lch(swatch.hex).l * swatch.weight, 0) / total : seed.l;
@@ -28,10 +28,10 @@ export function generateTheme(palette: string[], appearance: Appearance, policy:
     };
     const text = role('Primary text', color(dark ? 0.88 : 0.23, tint, seed.h));
     const muted = role('Secondary text', color(dark ? 0.63 : 0.49, tint, seed.h), all, policy.secondary);
-    const accent = role('Accent text', palette[2]);
+    const accent = role('Accent text', primary);
     const buttonBg = color(dark ? 0.42 : 0.65, Math.min(seed.c, 0.1), seed.h);
     const buttonHover = color(dark ? 0.46 : 0.6, Math.min(seed.c, 0.1), seed.h);
-    const indicator = role('Focus indicator', palette[2], [...all, buttonBg, buttonHover], policy.indicator);
+    const indicator = role('Focus indicator', primary, [...all, buttonBg, buttonHover], policy.indicator);
     const buttonFg = role('Primary button text', text, [buttonBg, buttonHover]);
     const put = (keys: string[], value: string) => keys.forEach(key => { colors[key] = value; });
     put(['editor.background', 'terminal.background'], bg);

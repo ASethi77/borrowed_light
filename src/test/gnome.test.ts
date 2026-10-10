@@ -13,7 +13,7 @@ suite('GNOME wallpaper smoke test', () => {
     test('real wallpaper sync, language editors, light/dark controls, and palette report', async function () {
         if (process.env.WALLPAPER_PASTE_GNOME_SMOKE !== '1') { this.skip(); }
         const config = vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
         const originals = Object.fromEntries(keys.map(key => [key, config.inspect(key)?.globalValue]));
         const fixtures = await mkdtemp(join(tmpdir(), 'wallpaper-paste-editors-'));
         try {

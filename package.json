@@ -2,7 +2,7 @@
   "name": "wallpaper-paste",
   "displayName": "Wallpaper Paste",
   "description": "Generate a readable VS Code theme from your GNOME desktop wallpaper",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.128.0"
   },
@@ -78,6 +78,50 @@
           "default": false,
           "scope": "application",
           "description": "Monitor wallpaper changes while a Wallpaper Paste theme is selected. Sync manually first to select it."
+        },
+        "wallpaper-paste.primaryDark": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "wallpaper-1",
+            "wallpaper-2",
+            "wallpaper-3",
+            "wallpaper-4",
+            "wallpaper-5",
+            "wallpaper-6",
+            "wallpaper-7",
+            "wallpaper-8",
+            "harmony-1",
+            "harmony-2",
+            "harmony-3",
+            "harmony-4",
+            "harmony-5"
+          ],
+          "default": "automatic",
+          "scope": "application",
+          "description": "Primary surface/accent color for dark mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
+        },
+        "wallpaper-paste.primaryLight": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "wallpaper-1",
+            "wallpaper-2",
+            "wallpaper-3",
+            "wallpaper-4",
+            "wallpaper-5",
+            "wallpaper-6",
+            "wallpaper-7",
+            "wallpaper-8",
+            "harmony-1",
+            "harmony-2",
+            "harmony-3",
+            "harmony-4",
+            "harmony-5"
+          ],
+          "default": "automatic",
+          "scope": "application",
+          "description": "Primary surface/accent color for light mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
         }
       }
     }
@@ -96,7 +140,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.2.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.3.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

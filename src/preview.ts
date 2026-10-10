@@ -1,14 +1,17 @@
 import * as vscode from 'vscode';
 import { ThemeApplication } from './application';
-import { Appearance, harmonies, Harmony, PreviewVariants } from './model';
+import { Appearance, harmonies, Harmony, PreviewVariants, PrimaryChoices, PaletteResult, PrimaryChoice, Swatch } from './model';
+import { primaryColors, resolvePrimary } from './primary';
+import { generateVariant } from './variants';
 import { Cancelled } from './pipeline';
 
-export interface PreviewChoice { harmony: Harmony; appearance: Appearance }
-export interface PreviewPicker { closed: Promise<PreviewChoice | undefined>; cancel(): Promise<PreviewChoice | undefined> }
+export interface PreviewChoice { harmony: Harmony; appearance: Appearance; primaries?: PrimaryChoices }
+export interface PreviewPicker { closed: Promise<PreviewChoice | undefined>; cancel(): Promise<PreviewChoice | undefined>; cyclePrimary(direction?: number): void; toggleAppearance(): void }
 interface PreviewOptions {
     application: ThemeApplication;
     prepare(signal: AbortSignal): Promise<PreviewChoice & { variants: PreviewVariants }>;
     enqueue(action: () => Promise<void>): Promise<void>;
+    generate?(swatches: Swatch[], harmony: Harmony, appearance: Appearance, primary: PrimaryChoice, signal: AbortSignal): Promise<PaletteResult>;
     error(error: unknown): void;
 }
 interface RuleItem extends vscode.QuickPickItem { rule: Harmony }
@@ -20,34 +23,53 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
     const previous: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('chevron-left'), tooltip: 'Previous color rule' };
     const next: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('chevron-right'), tooltip: 'Next color rule' };
     const brightness: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('color-mode'), tooltip: 'Toggle light/dark preview' };
+    const previousPrimary: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('arrow-left'), tooltip: 'Previous primary color' };
+    const nextPrimary: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('symbol-color'), tooltip: 'Next primary color (wallpaper and rule colors)' };
     picker.title = 'Wallpaper Paste: Loading color schemes…';
-    picker.placeholder = '↑/↓ preview a rule · toolbar buttons cycle or toggle light/dark · Enter keeps · Escape cancels';
+    picker.placeholder = '↑/↓ rules · toolbar: primary / light-dark · Enter keeps · Esc cancels';
     picker.items = items;
-    picker.buttons = [previous, next, brightness];
+    picker.buttons = [previous, next, previousPrimary, nextPrimary, brightness];
     picker.ignoreFocusOut = false;
     picker.busy = true; picker.enabled = false;
     const abort = new AbortController();
     let variants: PreviewVariants | undefined;
     let appearance: Appearance = 'dark', harmony: Harmony = 'analogous';
+    let primaries: PrimaryChoices = { dark: 'automatic', light: 'automatic' };
+    let generation: AbortController | undefined;
+    const cache = new Map<string, PaletteResult>();
     let revision = 0, appliedKey = '', requestedKey = '';
     let finishing: 'commit' | 'cancel' | undefined;
     let finished: Promise<PreviewChoice | undefined> | undefined;
     let resolveClosed!: (choice: PreviewChoice | undefined) => void;
     const closed = new Promise<PreviewChoice | undefined>(resolve => { resolveClosed = resolve; });
     const subscriptions: vscode.Disposable[] = [];
-    const selectionKey = () => `${harmony}/${appearance}`;
-    const title = () => { picker.title = `Wallpaper Paste: ${appearance === 'light' ? 'Light' : 'Dark'} preview`; };
+    const selectionKey = () => `${harmony}/${appearance}/${primaries[appearance]}`;
+    const title = () => {
+        const base = variants?.[harmony][appearance];
+        const primary = base && resolvePrimary(base.swatches, base.palette, primaries[appearance]);
+        picker.title = `Wallpaper Paste: ${appearance === 'light' ? 'Light' : 'Dark'} · ${primary ? `${primary.label} ${primary.hex}` : 'Loading'}`;
+    };
     const request = () => {
         if (!variants || finishing || requestedKey === selectionKey()) { return; }
         requestedKey = selectionKey();
-        const key = requestedKey, current = ++revision, theme = variants[harmony][appearance].theme;
+        const key = requestedKey, current = ++revision;
+        const rule = harmony, mode = appearance, primary = primaries[appearance], base = variants[rule][mode];
+        generation?.abort(); generation = new AbortController();
+        const signal = generation.signal;
+        title();
         picker.busy = true;
         void options.enqueue(async () => {
             if (current !== revision || finishing === 'cancel') { return; }
-            const applied = await options.application.apply(theme, () => current === revision && finishing !== 'cancel');
+            let result = cache.get(key);
+            if (!result) {
+                result = options.generate ? await options.generate(base.swatches, rule, mode, primary, signal) : generateVariant(base.swatches, rule, mode, primary);
+                cache.set(key, result);
+            }
+            if (current !== revision) { return; }
+            const applied = await options.application.apply(result.theme, () => current === revision && finishing !== 'cancel');
             if (applied && current === revision) { appliedKey = key; }
         }).catch(error => {
-            if (current === revision && !finishing) { options.error(error); void finish(false); }
+            if (!(error instanceof Cancelled) && current === revision && !finishing) { options.error(error); void finish(false); }
         }).finally(() => { if (current === revision && !finishing) { picker.busy = false; } });
     };
     const setup = (async () => {
@@ -57,6 +79,13 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
             await options.application.beginPreview();
             if (finishing) { return; }
             variants = prepared.variants; appearance = prepared.appearance; harmony = prepared.harmony;
+            primaries = { ...(prepared.primaries ?? primaries) };
+            for (const rule of harmonies) {
+                for (const mode of ['light', 'dark'] as Appearance[]) {
+                    const result = variants[rule][mode];
+                    cache.set(`${rule}/${mode}/${result.primary.id}`, result);
+                }
+            }
             title(); picker.activeItems = [items.find(item => item.rule === harmony)!];
             picker.enabled = true;
             request();
@@ -69,15 +98,15 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
         if (finished) { return finished; }
         finishing = keep ? 'commit' : 'cancel';
         if (!keep) { revision++; }
-        abort.abort(); picker.enabled = false; picker.busy = true;
+        abort.abort(); if (!keep) { generation?.abort(); } picker.enabled = false; picker.busy = true;
         finished = (async () => {
             let choice: PreviewChoice | undefined;
             try {
                 await setup;
                 await options.enqueue(async () => {
                     if (keep && appliedKey === selectionKey()) {
-                        await options.application.commitPreview(harmony, appearance);
-                        choice = { harmony, appearance };
+                        await options.application.commitPreview(harmony, appearance, primaries);
+                        choice = { harmony, appearance, primaries: { ...primaries } };
                     } else { await options.application.finishPreview(false); }
                 });
             } catch (error) {
@@ -91,11 +120,23 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
         })();
         return finished;
     }
+    const cyclePrimary = (direction = 1) => {
+        if (!variants || finishing) { return; }
+        const base = variants[harmony][appearance], colors = primaryColors(base.swatches, base.palette);
+        const index = Math.max(0, colors.findIndex(color => color.id === primaries[appearance]));
+        primaries[appearance] = colors[(index + direction + colors.length) % colors.length].id;
+        request();
+    };
+    const toggleAppearance = () => {
+        if (!variants || finishing) { return; }
+        appearance = appearance === 'dark' ? 'light' : 'dark'; request();
+    };
     subscriptions.push(
         picker.onDidChangeActive(active => { if (active[0] && !finishing) { harmony = active[0].rule; request(); } }),
         picker.onDidTriggerButton(button => {
             if (!variants || finishing) { return; }
-            if (button === brightness) { appearance = appearance === 'dark' ? 'light' : 'dark'; title(); }
+            if (button === brightness) { toggleAppearance(); }
+            else if (button === previousPrimary || button === nextPrimary) { cyclePrimary(button === previousPrimary ? -1 : 1); }
             else {
                 const index = (harmonies.indexOf(harmony) + (button === previous ? -1 : 1) + harmonies.length) % harmonies.length;
                 harmony = harmonies[index]; picker.value = ''; picker.activeItems = [items[index]];
@@ -110,5 +151,5 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
         picker.onDidHide(() => { void finish(false); }),
     );
     picker.show();
-    return { closed, cancel: () => finish(false) };
+    return { closed, cancel: () => finish(false), cyclePrimary, toggleAppearance };
 }

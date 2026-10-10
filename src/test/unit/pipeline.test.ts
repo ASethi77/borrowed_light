@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import * as jpeg from 'jpeg-js';
 import { decodeImage } from '../../palette-worker';
-import { Cancelled, runPipeline, runPreviews } from '../../pipeline';
+import { Cancelled, runPipeline, runPreviews, runVariant } from '../../pipeline';
 import { harmonies } from '../../model';
 import { reportHtml } from '../../report';
 
@@ -28,6 +28,11 @@ test('JPEG/PNG decode and packaged worker round-trip; paths need no shell escapi
     const previews = await runPreviews(resolve('dist/palette-worker.js'), { path: pngPath });
     const reused = await runPreviews(resolve('dist/palette-worker.js'), { swatches: result.swatches });
     assert.deepEqual(previews, reused);
+    const chosen = await runVariant(resolve('dist/palette-worker.js'), result.swatches, 'analogous', 'light', 'wallpaper-2');
+    assert.equal(chosen.primary.hex, result.swatches[1].hex);
+    const separate = await runPreviews(resolve('dist/palette-worker.js'), { swatches: result.swatches }, undefined, { dark: 'wallpaper-1', light: 'wallpaper-2' });
+    assert.equal(separate.analogous.dark.primary.hex, result.swatches[0].hex);
+    assert.equal(separate.analogous.light.primary.hex, result.swatches[1].hex);
     for (const harmony of harmonies) {
         for (const appearance of ['light', 'dark'] as const) {
             assert.equal(previews[harmony][appearance].theme.appearance, appearance);

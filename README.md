@@ -6,7 +6,7 @@ Generate a readable VS Code theme from your Fedora/GNOME desktop wallpaper. The 
 
 1. Install the VSIX through **Extensions: Install from VSIX…**, or open this directory in VS Code and press **F5**.
 2. Run **Wallpaper Paste: Sync Theme from Wallpaper** from the Command Palette.
-   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
+   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The **symbol-color** button cycles the primary color; the adjacent left arrow cycles it backwards. The title shows its source and hex value. Light and dark previews remember separate primary choices. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
 3. Run **Wallpaper Paste: Show Palette and Contrast Report** to inspect the wallpaper's colors, generated harmony, readability adjustments, and contrast measurements. This command does not apply a theme.
 4. Optionally enable `wallpaper-paste.autoSync` in Settings. Monitoring applies changes while a Wallpaper Paste theme is selected. Choosing another theme pauses application.
 5. Run **Wallpaper Paste: Restore Previous Theme** to turn off auto-sync and restore settings from before the first sync. Later user edits are preserved.
@@ -29,6 +29,8 @@ The default is a dark analogous theme. Generated colors are stored in theme-spec
 | --- | --- | --- |
 | `wallpaper-paste.harmony` | `analogous` | `analogous`, `monochromatic`, `triad`, `complementary`, `compound`, `shades` |
 | `wallpaper-paste.appearance` | `dark` | `dark`, `light`, `desktop` |
+| `wallpaper-paste.primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
+| `wallpaper-paste.primaryLight` | `automatic` | Same options, remembered independently for light mode |
 | `wallpaper-paste.autoSync` | `false` | Enable wallpaper/appearance monitoring and periodic file checks |
 
 Settings apply at application scope. With auto-sync off, change settings and run Sync again to apply them. With auto-sync on, changes regenerate the selected Wallpaper Paste theme. Monitoring uses GNOME change notifications plus a check every 30 seconds for file changes, including replacement at the same path. Source changes are debounced for 500 ms; superseded workers are cancelled.
@@ -51,6 +53,8 @@ Recipes use OKLCH hue angles and lightness/chroma. Out-of-gamut colors reduce ch
 | Shades | Seed hue/chroma with descending lightness |
 
 Light themes use the wallpaper's weighted brightness and colorfulness to set surface lightness and tint, so colorful wallpapers produce visible differences in the editor, sidebar, and fields. Grayscale wallpapers remain neutral. The preview prepares all twelve rule/appearance combinations in a worker after one extraction; cycling reuses these results without decoding the image again. Automatic syncing waits while the picker is open. Interrupted previews are restored when the extension next activates.
+
+Primary colors include both extracted wallpaper swatches (ordered by their image coverage) and colors derived by the selected harmony. This allows smaller blue, yellow, or red highlights to drive the surfaces and accents even when the dominant background is green. Syntax still uses the selected harmony, with contrast adjustments recalculated for the chosen surfaces. Preferences store source slots rather than fixed hex values: they adapt to new wallpapers and rules, and a missing wallpaper slot falls back to automatic. New primary previews are generated in the worker from the existing swatches and cached for the session. Enter saves both modes' choices; Escape discards them.
 
 ## Readability and the report
 
@@ -78,7 +82,7 @@ VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 xvfb-run -a env VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 ```
 
-Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.2.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
+Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.3.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
 
 ## Extension points
 

@@ -4,6 +4,7 @@ import { contrast, extract, harmonize, lch, matrix, readable } from '../../color
 import { Appearance, harmonies } from '../../model';
 import { generateTheme } from '../../theme';
 import { generateVariant } from '../../variants';
+import { isPrimaryChoice, primaryColors, resolvePrimary } from '../../primary';
 
 const swatches = [{ hex: '#248abb', weight: 0.7 }, { hex: '#dc7b4d', weight: 0.3 }];
 test('WCAG reference ratios, symmetry, and diagonal', () => {
@@ -87,4 +88,30 @@ test('light surfaces reflect wallpaper hue, brightness, and colorfulness while r
             }
         }
     }
+});
+test('primary colors include small wallpaper highlights and rule colors without changing the harmony', () => {
+    const wallpaper = [
+        { hex: '#229944', weight: 0.7 }, { hex: '#2266cc', weight: 0.15 },
+        { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 },
+    ];
+    for (const harmony of ['analogous', 'triad'] as const) {
+        const palette = harmonize(wallpaper, harmony).palette;
+        const choices = primaryColors(wallpaper, palette);
+        assert.deepEqual(choices.filter(choice => choice.id.startsWith('wallpaper')).map(choice => choice.hex), wallpaper.map(swatch => swatch.hex));
+        for (const appearance of ['light', 'dark'] as Appearance[]) {
+            const backgrounds = new Set<string>();
+            for (const choice of choices) {
+                const result = generateVariant(wallpaper, harmony, appearance, choice.id);
+                assert.deepEqual(result.palette, palette);
+                assert.equal(result.primary.hex, choice.hex);
+                backgrounds.add(result.theme.colors['editor.background']);
+                result.theme.checks.forEach(check => assert.ok(check.ratio >= check.minimum, `${appearance}/${choice.id}/${check.role}`));
+            }
+            assert.ok(backgrounds.size >= 4, `${appearance} offers visibly different primary surfaces`);
+        }
+        assert.equal(resolvePrimary(wallpaper, palette, 'wallpaper-8').id, 'automatic');
+    }
+    assert.ok(isPrimaryChoice('harmony-5'));
+    assert.ok(!isPrimaryChoice('wallpaper-9'));
+    assert.ok(!isPrimaryChoice('#2266cc'));
 });
