@@ -8,8 +8,10 @@ Borrowed Light separates desktop wallpaper discovery from image processing, colo
 | --- | --- |
 | [src/extension.ts](src/extension.ts) | Commands, settings, sync scheduling, cancellation, and lifecycle |
 | [src/model.ts](src/model.ts) | Provider contracts, palette/theme data, preferences, and contrast policy |
-| [src/providers.ts](src/providers.ts) | Desktop detection, wallpaper discovery, and change notifications |
-| [src/pipeline.ts](src/pipeline.ts), [src/palette-worker.ts](src/palette-worker.ts) | Worker lifecycle and image decoding |
+| [src/platform/os_detect.ts](src/platform/os_detect.ts), [src/platform/os_wallpaper.ts](src/platform/os_wallpaper.ts) | OS/desktop detection, provider override routing, and native decoder selection |
+| [src/platform/](src/platform/) | Windows/macOS helpers and Linux desktop implementations, plus provider/decoder contracts |
+| [src/image/](src/image/) | Portable file URIs, bounded file reads, JPEG/PNG decoding, and image limits |
+| [src/pipeline.ts](src/pipeline.ts), [src/palette-worker.ts](src/palette-worker.ts) | Worker lifecycle, native-conversion requests, and palette generation |
 | [src/color/code.ts](src/color/code.ts), [src/color/conversion.ts](src/color/conversion.ts) | Validated hex colors and the Culori/OKLCH adapter |
 | [src/color/extraction.ts](src/color/extraction.ts) | Sampling, opacity-weighted histogram, and median-cut swatches |
 | [src/color/harmony.ts](src/color/harmony.ts), [src/color/contrast.ts](src/color/contrast.ts) | Harmony recipes, luminance/contrast, and readability search |
@@ -34,7 +36,7 @@ flowchart LR
 
 Manual Sync discovers the configured wallpaper, generates the selected appearance, checks its contrast targets, and applies it. Automatic sync requires `borrowed-light.autoSync` and a selected Borrowed Light theme. Choosing another theme prevents automatic application.
 
-The GNOME provider watches wallpaper settings and desktop appearance changes. A 30-second timer also checks for file changes, including replacement at the same path. Notifications are debounced for 500 ms. A signature combines the wallpaper URI, file size/timestamps/inode, harmony, appearance, primary choices, and syntax style; unchanged automatic requests skip regeneration.
+The GNOME provider watches wallpaper settings and desktop appearance changes. Windows/macOS use polling; a 30-second timer on every platform checks for wallpaper and file changes, including replacement at the same path. Notifications are debounced for 500 ms. A signature combines the wallpaper URI, file size/timestamps/inode, harmony, appearance, primary choices, and syntax style; unchanged automatic requests skip regeneration.
 
 New requests cancel superseded workers. Revision checks prevent stale results from being applied, and configuration writes run through a serial queue. Failures retain the last applied theme; a partially failed application attempts rollback.
 
@@ -59,21 +61,38 @@ All preferences are application-scoped under `borrowed-light.*`.
 | `primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
 | `primaryLight` | `automatic` | Same source slots, remembered independently |
 | `syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
+| `platformProvider` | `auto` | `auto`, `windows`, `macos`, `linux-gnome`; overrides must match the host OS |
 | `autoSync` | `false` | Boolean; enables notifications and periodic checks |
 
 ## Platform boundary
 
-`WallpaperProvider` exposes `available()`, `current()`, and optional `watch()` methods. `providerRegistry` selects a provider using the OS and desktop environment. Unsupported desktops receive an explicit unsupported-provider error. Add a provider registration for Windows, macOS, or another Linux desktop without changing extraction or theme generation.
+OS-specific code lives under `src/platform/`: `windows/`, `macos/`, and `linux/gnome/`. Future Linux desktop implementations get sibling subfolders under `linux/`. Linux commands use argument arrays; no user-controlled shell expression is evaluated.
 
-The current provider recognizes Linux GNOME sessions and checks for the GNOME background/interface schemas. It reads `gsettings` with argument arrays, parses GVariant strings, and resolves local `file://` URIs. GNOME's appearance chooses `picture-uri-dark` or `picture-uri`; an unavailable or empty dark key falls back to the regular wallpaper. This image choice follows GNOME independently of VS Code's chosen light/dark appearance.
+`os_detect.ts` returns a typed OS and Linux desktop identity, with `UNKNOWN` and raw session identifiers for diagnostics. It uses Node's host platform and recognizes colon-separated `XDG_CURRENT_DESKTOP` values, then falls back to `DESKTOP_SESSION`. Recognizing a desktop does not imply provider support.
 
-OS differences belong in providers. Decoding and color extraction are shared TypeScript worker stages, so another platform can reuse the same JPEG/PNG pipeline. The extension runs in the local UI extension host, including when the workspace is remote.
+`os_wallpaper.ts` selects a `WallpaperProvider` with `available()`, `current()`, and optional `watch()` methods. Automatic selection chooses Windows, macOS, or Linux/GNOME. The `platformProvider` setting can select an implemented provider explicitly when session detection is ambiguous; incompatible OS overrides fail clearly. A change stops old monitors and pending generations, reprobes the provider, and waits for that probe before new reads. Unsupported/unavailable providers report the detected environment or missing capability.
+
+GNOME checks background/interface schemas, reads `gsettings`, and parses quoted GVariant strings. GNOME's appearance chooses `picture-uri-dark` or `picture-uri`; an unavailable/empty dark key falls back to the regular wallpaper. Its settings monitors are retained.
+
+Windows runs fixed PowerShell/C# code using built-in Windows PowerShell. [IDesktopWallpaper](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-idesktopwallpaper) supplies per-monitor wallpaper paths. The helper queries primary Win32 monitor geometry, and the TypeScript boundary matches it to the wallpaper monitor rectangles rather than assuming enumeration order. Appearance follows `SystemUsesLightTheme`. No wallpaper settings are changed.
+
+macOS runs fixed JavaScript/Objective-C bridge code with `/usr/bin/osascript`. AppKit's first screen identifies the primary/menu-bar display; [NSWorkspace.desktopImageURL](https://developer.apple.com/documentation/appkit/nsworkspace/desktopimageurl(for:)) returns its wallpaper file. Appearance uses AppKit's effective appearance. The implementation uses framework calls rather than controlling Finder/System Events through Apple Events.
+
+The local UI extension host owns platform helpers, including in remote workspaces. Helpers use fixed source and argument-based execution with bounded stdout/stderr, deadlines, and process termination on cancellation. Input image bytes travel through stdin, not script interpolation. No external installations or native Node modules are required.
+
+### Native image fallback
+
+Portable JPEG/PNG decoding stays in `src/image/` and runs identically on every OS, using file signatures rather than extensions. Other formats request an OS-specific `NativeImageDecoder`: Windows uses WPF/WIC's on-demand bitmap decoder (including BMP); macOS uses ImageIO metadata and AppKit PNG encoding (including HEIC). Both inspect dimensions before raster creation and return bounded PNG bytes for the same portable decoder. Corrupt recognized JPEG/PNG files do not silently fall back to another decoder.
+
+The worker sends source bytes to its parent over a native-conversion request. The extension host owns that subprocess and returns normalized bytes; the job's deadline includes conversion. Abort, disposal, timeout, or worker failure stops the outstanding helper so terminating a worker cannot orphan it. Conversion stays in memory and leaves no temporary wallpaper copies.
+
+Multi-image files use index 0. Windows slideshows use the current file reported by the OS; active macOS dynamic frame selection, animations, cropping, and screenshot capture are outside this release. Native codec availability depends on the OS. Built-in helper restrictions and unsupported formats produce errors while retaining the last applied theme.
 
 ### Image-processing bounds
 
-The worker accepts regular JPEG/PNG files up to 64 MiB and 32 megapixels. It has a 15-second deadline and a 128 MiB old-generation heap limit; the JPEG decoder separately has a 512 MiB allocation budget. These limits constrain processing without claiming to cap total process memory at 128 MiB.
+The worker accepts regular files up to 64 MiB and 32 megapixels; native normalized PNG output is also limited to 64 MiB. It has a 15-second deadline and a 128 MiB old-generation heap limit; the JPEG decoder separately has a 512 MiB allocation budget. These limits constrain processing without claiming to cap total process memory at 128 MiB. Native decoders run outside that worker heap and may allocate their own buffers.
 
-Images are interpreted as sRGB without embedded ICC color management. Transparent pixels are ignored and partially transparent samples are opacity-weighted. Extraction reads the configured image rather than capturing the desktop, so it does not model monitor cropping, overlays, multi-monitor composition, or live transitions.
+The shared JPEG/PNG decoder interprets samples as sRGB without embedded ICC color management; native normalization may perform OS codec color conversions. Transparent pixels are ignored and partially transparent samples are opacity-weighted. Extraction reads the configured image rather than capturing the desktop, so it does not model monitor cropping, overlays, multi-monitor composition, or live transitions.
 
 ## Color representations and boundaries
 
@@ -136,7 +155,7 @@ These checks cover controlled theme roles, not every rendered pixel or an overal
 ## Extension points
 
 - Add OS/desktop discovery and notifications through `WallpaperProvider` and `providerRegistry`.
-- Add image formats in the worker without coupling extraction to the desktop provider.
+- Add portable formats in `src/image/` or native codecs under `src/platform/`, keeping extraction independent of discovery.
 - Extend harmony and syntax strategies through the palette/variant stages.
 - Add future high-contrast or focused modes through `ContrastPolicy`, preserving primary text requirements while adjusting secondary/comment emphasis. Only the balanced policy is currently exposed.
 

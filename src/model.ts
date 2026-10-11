@@ -10,14 +10,7 @@ export type PrimaryChoice = 'automatic' | `wallpaper-${1 | 2 | 3 | 4 | 5 | 6 | 7
 export type PrimaryChoices = Record<Appearance, PrimaryChoice>;
 export interface PrimaryColor { id: PrimaryChoice; hex: HexColorCode; label: string }
 export interface Swatch { hex: HexColorCode; weight: number }
-export interface Wallpaper { uri: string; appearance: Appearance; provider: string }
-export interface Disposable { dispose(): void }
-export interface WallpaperProvider {
-    readonly id: string;
-    available(): Promise<boolean>;
-    current(): Promise<Wallpaper>;
-    watch?(changed: () => void, failed: (error: Error) => void): Disposable;
-}
+export type { Wallpaper, WallpaperProvider, Disposable } from './platform/contracts';
 export interface ContrastPolicy {
     readonly id: string;
     text: number;

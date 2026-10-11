@@ -4,7 +4,7 @@
 
 Use Node.js **24** and npm to match CI. VS Code **1.128 or later** is required to run the extension. Automated host tests download a VS Code build unless an installed executable is specified.
 
-On headless Linux, host tests require `xvfb` and the system libraries needed by VS Code/Electron. The [CI workflow](.github/workflows/ci.yml) lists its Ubuntu dependencies. A local GNOME session and JPEG/PNG wallpaper are required only for real desktop smoke tests and manual wallpaper syncing. These development dependencies are separate from the user installation, which requires no additional wallpaper-processing tools.
+On headless Linux, host tests require `xvfb` and the system libraries needed by VS Code/Electron. The [CI workflow](.github/workflows/ci.yml) lists its Ubuntu dependencies. A local supported desktop session and wallpaper are required only for real desktop smoke tests and manual wallpaper syncing. These development dependencies are separate from the user installation, which requires no additional wallpaper-processing tools.
 
 ## Install, build, and run
 
@@ -39,7 +39,7 @@ npm run test:unit
 npm run test:host
 ```
 
-Run the unit command first: it builds the bundles, compiles tests to `out/`, and runs the Node.js unit suite. The suite covers extraction, harmony/contrast behavior, syntax diversity, worker processing/cancellation, provider parsing, and ownership restoration. Compile-only checks enforce the validated color contract. `color-regression.test.ts` fingerprints 768 complete theme variants captured before the color refactor and compares extraction fixtures; update those baselines only when intentionally changing generated output. If bundles are already built and only host tests changed, `npm run compile-tests` refreshes the compiled tests.
+Run the unit command first: it builds the bundles, compiles tests to `out/`, and runs the Node.js unit suite. The suite covers extraction, harmony/contrast behavior, syntax diversity, worker processing/cancellation, platform detection/routing, provider parsing, native-helper lifecycle, and ownership restoration. Windows runs the actual BMP helper and macOS the actual HEIC helper against committed fixtures; those native codec tests are skipped on Linux. Compile-only checks enforce the validated color contract. `color-regression.test.ts` fingerprints 768 complete theme variants captured before the color refactor and compares extraction fixtures; update those baselines only when intentionally changing generated output. If bundles are already built and only host tests changed, `npm run compile-tests` refreshes the compiled tests.
 
 Host tests run in an isolated VS Code profile and exercise commands, live configuration, previews, persistence/restoration, and real language grammar scopes. The [test configuration](.vscode-test.mjs) selects the test files and launch options. `npm test` runs both suites in order.
 
@@ -57,6 +57,10 @@ xvfb-run -a -s '-screen 0 1440x1000x24' \
 ```
 
 Add `VSCODE_EXECUTABLE_PATH=/path/to/code` to that `env` command to use an installed copy instead.
+
+### Windows/macOS desktop smoke tests
+
+Set `BORROWED_LIGHT_NATIVE_SMOKE=1` when running `npm run test:host` in a real Windows/macOS desktop session. PowerShell users can set `$env:BORROWED_LIGHT_NATIVE_SMOKE = '1'` first. This opt-in test reads the primary display wallpaper, syncs, and opens the report. It restores the settings it changes. Native decoding tests run automatically in the unit suite on their matching OS; actual desktop discovery remains a separate manual/session check.
 
 ### GNOME desktop smoke tests
 
@@ -92,13 +96,13 @@ The `borrowed-light-local` publisher is a local packaging placeholder. Replace i
 
 ## Continuous integration
 
-[GitHub Actions CI](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It uses Node.js 24 on Ubuntu, installs with `npm ci`, runs type/lint/unit checks and headless VS Code tests, then packages the VSIX.
+[GitHub Actions CI](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. Its Node.js 24 matrix runs on Ubuntu 24.04, Windows 2025, and macOS 15. Each runner installs with `npm ci` and runs type/lint/unit and VS Code host tests; Linux uses Xvfb. Windows/macOS unit tests execute their native decoders. Only Linux packages and uploads the VSIX.
 
-Successful runs upload a `borrowed-light-vsix` artifact retained for 14 days. Hosted CI skips the real GNOME desktop smoke tests and does not publish to the Marketplace. Workflow configuration stays in [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Successful runs upload a `borrowed-light-vsix` artifact retained for 14 days. Hosted CI skips opt-in live desktop discovery smoke tests on all OSes and does not publish to the Marketplace. Workflow configuration stays in [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Manual verification
 
-Try colorful and grayscale JPEG/PNG wallpapers in both appearances. Cycle rules, primary hues, and syntax styles; inspect TypeScript/Python/Markdown, buttons, fields, selections, sidebar, status bar, terminal, and notifications. Test Enter/Escape and verify that changing rules keeps the active appearance.
+Try colorful and grayscale JPEG/PNG wallpapers in both appearances, plus BMP on Windows and HEIC on macOS. With distinct wallpapers on multiple displays, verify Windows/macOS choose the primary display. Test automatic provider detection and a compatible override; an incompatible override must leave the applied theme intact. Cycle rules, primary hues, and syntax styles; inspect TypeScript/Python/Markdown, buttons, fields, selections, sidebar, status bar, terminal, and notifications. Test Enter/Escape and verify that changing rules keeps the active appearance.
 
 Then change the wallpaper with auto-sync enabled, select a different theme to verify pausing, edit a generated setting, and run Restore to confirm the manual edit survives. Run Restore in the development window when you want to remove its applied theme settings.
 

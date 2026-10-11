@@ -1,0 +1,88 @@
+/** Built-in Windows PowerShell hosts the Win32 COM bridge; no installed SDK is needed.
+ * IDesktopWallpaper: https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-idesktopwallpaper
+ * Match GetMonitorRECT to the primary Win32 monitor rather than assuming monitor index 0.
+ */
+export const desktopInteropScript = String.raw`
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace BorrowedLight {
+    [StructLayout(LayoutKind.Sequential)] public struct Rectangle { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] public struct MonitorInfo { public int Size; public Rectangle Monitor, Work; public uint Flags; }
+    [ComImport, Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IDesktopWallpaper {
+        void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string monitor, [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
+        [return: MarshalAs(UnmanagedType.LPWStr)] string GetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string monitor);
+        [return: MarshalAs(UnmanagedType.LPWStr)] string GetMonitorDevicePathAt(uint index);
+        uint GetMonitorDevicePathCount();
+        Rectangle GetMonitorRECT([MarshalAs(UnmanagedType.LPWStr)] string monitor);
+    }
+    public class MonitorWallpaper { public Rectangle Bounds; public string Path; }
+    public class WallpaperSnapshot { public Rectangle Primary; public MonitorWallpaper[] Monitors; }
+    public static class Desktop {
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(Point point, uint flags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+        [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+        public static WallpaperSnapshot Snapshot() {
+            // Compare physical monitor rectangles even when displays use different scaling.
+            // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE = -3; restore this thread afterwards.
+            IntPtr previousContext = SetThreadDpiAwarenessContext(new IntPtr(-3));
+            if (previousContext == IntPtr.Zero) throw new Exception("Cannot query physical display coordinates");
+            try { return PhysicalSnapshot(); }
+            finally { SetThreadDpiAwarenessContext(previousContext); }
+        }
+        static WallpaperSnapshot PhysicalSnapshot() {
+            var primary = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
+            if (!GetMonitorInfo(MonitorFromPoint(new Point(), 1), ref primary)) throw new Exception("Cannot identify primary display");
+            var desktop = (IDesktopWallpaper)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD")));
+            try {
+                var monitors = new System.Collections.Generic.List<MonitorWallpaper>();
+                for (uint index = 0; index < desktop.GetMonitorDevicePathCount(); index++) {
+                    string monitor = desktop.GetMonitorDevicePathAt(index);
+                    Rectangle rectangle = desktop.GetMonitorRECT(monitor);
+                    monitors.Add(new MonitorWallpaper { Bounds = rectangle, Path = desktop.GetWallpaper(monitor) });
+                }
+                return new WallpaperSnapshot { Primary = primary.Monitor, Monitors = monitors.ToArray() };
+            } finally { Marshal.FinalReleaseComObject(desktop); }
+        }
+    }
+}
+'@
+`;
+export const wallpaperScript = String.raw`${desktopInteropScript}
+$snapshot = [BorrowedLight.Desktop]::Snapshot()
+$theme = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -ErrorAction SilentlyContinue
+$appearance = if ($null -ne $theme -and $theme.SystemUsesLightTheme -eq 0) { 'dark' } else { 'light' }
+[Console]::WriteLine((@{ primary = $snapshot.Primary; monitors = @($snapshot.Monitors | ForEach-Object { @{ bounds = $_.Bounds; path = $_.Path } }); appearance = $appearance } | ConvertTo-Json -Depth 6 -Compress))
+`;
+
+/** WPF's on-demand WIC decoder exposes dimensions before CopyPixels/PNG encoding.
+ * Consume source bytes on stdin; write ONLY PNG bytes on stdout (no path interpolation).
+ * https://learn.microsoft.com/dotnet/api/system.windows.media.imaging.bitmapdecoder.create
+ */
+export const imageScript = String.raw`
+$ErrorActionPreference = 'Stop'
+try {
+    Add-Type -AssemblyName PresentationCore, WindowsBase
+    $inputStream = [Console]::OpenStandardInput()
+    $source = New-Object System.IO.MemoryStream
+    $inputStream.CopyTo($source)
+    if ($source.Length -gt 67108864) { throw 'Wallpaper exceeds the 64 MiB input limit' }
+    $source.Position = 0
+    $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create($source, [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnDemand)
+    $frame = $decoder.Frames[0]
+    if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or [long]$frame.PixelWidth * $frame.PixelHeight -gt 32000000) { throw 'Wallpaper exceeds the 32 megapixel limit' }
+    $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+    $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($frame))
+    $output = New-Object System.IO.MemoryStream
+    $encoder.Save($output)
+    if ($output.Length -gt 67108864) { throw 'Normalized wallpaper exceeds the 64 MiB output limit' }
+    $output.Position = 0
+    $output.CopyTo([Console]::OpenStandardOutput())
+    $output.Dispose()
+    $source.Dispose()
+} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
+`;

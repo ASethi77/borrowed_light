@@ -77,7 +77,7 @@
           ],
           "default": "dark",
           "scope": "application",
-          "description": "Generated theme appearance. Desktop follows GNOME light/dark preference."
+          "description": "Generated theme appearance. Desktop follows the local platform's light/dark preference."
         },
         "borrowed-light.autoSync": {
           "type": "boolean",
@@ -146,6 +146,18 @@
           "default": "balanced",
           "scope": "application",
           "description": "Syntax highlighting style. Cycle live using the keyword button in the wallpaper preview."
+        },
+        "borrowed-light.platformProvider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "windows",
+            "macos",
+            "linux-gnome"
+          ],
+          "default": "auto",
+          "scope": "application",
+          "description": "Wallpaper provider. Auto detects the local OS and Linux desktop. Override for ambiguous Linux sessions; providers must match the host OS."
         }
       }
     },

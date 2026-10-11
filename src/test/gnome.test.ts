@@ -14,7 +14,7 @@ suite('GNOME wallpaper smoke test', () => {
     test('rule cycling follows the active Borrowed Light appearance despite the opposite saved setting', async function () {
         if (process.env.BORROWED_LIGHT_GNOME_SMOKE !== '1') { this.skip(); }
         const config = () => vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.appearance', 'borrowed-light.harmony', 'borrowed-light.autoSync', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.appearance', 'borrowed-light.harmony', 'borrowed-light.autoSync', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.platformProvider'];
         const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
         let preview: Thenable<unknown> | undefined;
         const wait = async (predicate: () => boolean) => {
@@ -56,7 +56,7 @@ suite('GNOME wallpaper smoke test', () => {
     test('real wallpaper sync, language editors, light/dark controls, and palette report', async function () {
         if (process.env.BORROWED_LIGHT_GNOME_SMOKE !== '1') { this.skip(); }
         const config = vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.appearance', 'borrowed-light.harmony', 'borrowed-light.autoSync', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.appearance', 'borrowed-light.harmony', 'borrowed-light.autoSync', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.platformProvider'];
         const originals = Object.fromEntries(keys.map(key => [key, config.inspect(key)?.globalValue]));
         const fixtures = await mkdtemp(join(tmpdir(), 'borrowed-light-editors-'));
         try {
@@ -111,6 +111,30 @@ suite('GNOME wallpaper smoke test', () => {
             assert.equal(vscode.workspace.getConfiguration().get('borrowed-light.autoSync'), false);
         } finally {
             for (const key of keys) { await config.update(key, originals[key], vscode.ConfigurationTarget.Global); }
+        }
+    });
+});
+
+suite('GNOME provider override smoke test', () => {
+    test('provider changes take effect before sync and incompatible overrides retain the theme', async function () {
+        if (process.env.BORROWED_LIGHT_GNOME_SMOKE !== '1') { this.skip(); }
+        const config = () => vscode.workspace.getConfiguration();
+        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.platformProvider'];
+        const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
+        try {
+            await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+            await config().update('borrowed-light.platformProvider', 'linux-gnome', vscode.ConfigurationTarget.Global);
+            await vscode.commands.executeCommand('borrowed-light.sync');
+            const before = Object.fromEntries([...customizationSections, 'workbench.colorTheme'].map(key => [key, config().inspect(key)?.globalValue]));
+            await config().update('borrowed-light.platformProvider', 'windows', vscode.ConfigurationTarget.Global);
+            await vscode.commands.executeCommand('borrowed-light.sync');
+            for (const [key, value] of Object.entries(before)) { assert.deepEqual(config().inspect(key)?.globalValue, value, key); }
+            await config().update('borrowed-light.platformProvider', 'auto', vscode.ConfigurationTarget.Global);
+            await vscode.commands.executeCommand('borrowed-light.sync');
+            assert.ok(String(config().get('workbench.colorTheme')).startsWith('Borrowed Light'));
+        } finally {
+            await vscode.commands.executeCommand('borrowed-light.restore');
+            for (const key of keys) { await config().update(key, originals[key], vscode.ConfigurationTarget.Global); }
         }
     });
 });

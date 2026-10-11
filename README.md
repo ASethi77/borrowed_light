@@ -6,7 +6,7 @@ Turn your desktop wallpaper into a readable VS Code theme. Borrowed Light colors
 
 > **Automatically generate light and dark themes from the same wallpaper.** Preview both appearances, choose a primary hue for each, and keep your preferred theme.
 
-**No external software needs to be installed to sync with your wallpaper on a supported GNOME desktop.** Borrowed Light uses GNOME's built-in wallpaper settings and includes its own image processing.
+**No external software needs to be installed on supported desktops.** Borrowed Light includes JPEG/PNG decoding and uses built-in OS capabilities for wallpaper discovery and additional native image formats.
 
 ## Supported platforms
 
@@ -16,12 +16,12 @@ Turn your desktop wallpaper into a readable VS Code theme. Borrowed Light colors
 | Other Linux distributions | GNOME | Uses the same provider; not yet validated |
 | Linux | KDE Plasma | Not yet supported |
 | Linux | Xfce, Cinnamon, MATE, and other desktops | Not yet supported |
-| Windows | Windows desktop | Not yet supported |
-| macOS | macOS desktop | Not yet supported |
+| Windows | Windows desktop | Implemented; native desktop validation pending |
+| macOS | macOS desktop | Implemented; native desktop validation pending |
 
-Use VS Code **1.128 or later** with a local JPEG or PNG wallpaper, up to **64 MiB / 32 megapixels**. GNOME's standard wallpaper settings must be accessible to VS Code. Sandboxed installations such as Flatpak may restrict that access.
+Use VS Code **1.128 or later** with a local wallpaper, up to **64 MiB / 32 megapixels**. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
 
-Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpaper**. VS Code for the Web, live wallpapers, and GNOME XML slideshows are unsupported.
+Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpaper**. VS Code for the Web, live wallpapers, solid-color backgrounds, and GNOME XML slideshows are unsupported. Windows/macOS use the primary display's wallpaper; GNOME uses its configured wallpaper image. Multi-image files use the first still frame, which may differ from macOS's active dynamic wallpaper frame.
 
 ## Get started
 
@@ -29,7 +29,7 @@ Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpa
 2. Open the Command Palette and run **Borrowed Light: Sync Theme from Wallpaper**.
 3. Click **Borrowed Light** in the status bar, or run **Borrowed Light: Preview Color Schemes**, to explore alternatives.
 
-The initial theme is dark with the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow GNOME's appearance.
+The initial theme is dark with the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
 
 ## Make it your own
 
@@ -46,7 +46,7 @@ The preview updates your actual editor and workbench as you make changes.
 
 **Mellow** uses soft colors, **Balanced** adds moderate colorfulness, and **Vibrant** gives syntax categories more distinct colors. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
 
-Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
+Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. Windows/macOS check for changes every 30 seconds; GNOME also listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
 
 ## Demos
 

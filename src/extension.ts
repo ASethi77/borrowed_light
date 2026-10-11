@@ -5,17 +5,23 @@ import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpap
 import { Cancelled, runPipeline, runPreviews, runVariant } from './pipeline';
 import { isPrimaryChoice } from './primary';
 import { createPreviewPicker, PreviewPicker } from './preview';
-import { selectProvider, wallpaperPath } from './providers';
+import { selectProvider } from './platform/os_wallpaper';
+import { detectPlatform } from './platform/os_detect';
+import { wallpaperPath } from './image/source';
 import { reportHtml } from './report';
 import { themeNames } from './color/theme';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const output = vscode.window.createOutputChannel('Borrowed Light');
-    const provider = await selectProvider();
+    const platform = detectPlatform();
+    let provider = await selectProvider(platform, vscode.workspace.getConfiguration('borrowed-light').get('platformProvider', 'auto'));
+    output.appendLine(`Platform: ${platform.os}/${platform.desktop}; provider: ${provider.id}`);
     const application = new ThemeApplication(context.globalState);
     try { await application.recoverPreview(); } catch (value) { output.appendLine(`Could not restore an interrupted preview: ${String(value)}`); }
     const workerPath = context.asAbsolutePath('dist/palette-worker.js');
     let disposed = false, revision = 0, signature = '', lastError = '';
+    let providerRevision = 0;
+    let providerUpdate = Promise.resolve();
     let cached: { signature: string; result: PaletteResult } | undefined;
     let abort: AbortController | undefined;
     let monitor: { dispose(): void } | undefined;
@@ -40,6 +46,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (manual) { void vscode.window.showErrorMessage(`Borrowed Light: ${message}`); }
     };
     const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; syntaxStyle: SyntaxStyle }> => {
+        // Wait for the latest override probe before manual sync/report/preview reads.
+        let pending: Promise<void>;
+        do { pending = providerUpdate; await pending; } while (pending !== providerUpdate);
+        if (disposed) { throw new Cancelled(); }
         const config = settings();
         const harmony = config.get<Harmony>('harmony', 'analogous');
         if (!harmonies.includes(harmony)) { throw new Error('Unknown harmony setting'); }
@@ -167,7 +177,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             } catch (value) { error(value, true); }
         }),
         vscode.workspace.onDidChangeConfiguration(event => {
-            if (event.affectsConfiguration('borrowed-light')) { cancel(); signature = ''; configureMonitoring(); }
+            if (event.affectsConfiguration('borrowed-light')) {
+                cancel(); signature = '';
+                if (event.affectsConfiguration('borrowed-light.platformProvider')) {
+                    stop();
+                    reportWorkers.forEach(worker => worker.abort());
+                    const currentProviderRevision = ++providerRevision;
+                    providerUpdate = (async () => {
+                        await preview?.cancel();
+                        // Guard against rapid preference changes or disposal while probing helpers.
+                        const current = settings().get('platformProvider', 'auto');
+                        const replacement = await selectProvider(platform, current);
+                        if (disposed || currentProviderRevision !== providerRevision || settings().get('platformProvider', 'auto') !== current) { return; }
+                        provider = replacement; cached = undefined;
+                        output.appendLine(`Wallpaper provider: ${provider.id}`);
+                        configureMonitoring();
+                    })().catch(value => error(value, false));
+                } else { configureMonitoring(); }
+            }
             else if (event.affectsConfiguration('workbench.colorTheme')) {
                 if (!application.ownedThemeActive) { cancel(); void preview?.cancel(); }
                 else { schedule(); }

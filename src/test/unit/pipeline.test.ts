@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import * as jpeg from 'jpeg-js';
-import { decodeImage } from '../../palette-worker';
+import { decodeImage } from '../../image/decode';
 import { Cancelled, runPipeline, runPreviews, runVariant } from '../../pipeline';
 import { harmonies } from '../../model';
 import { reportHtml } from '../../report';
@@ -66,16 +66,16 @@ test('malformed, unsupported, oversized PNG and missing files reject without app
 });
 test('cancelled and superseded worker generations cannot return stale results', async () => {
     const abort = new AbortController(); abort.abort();
-    await assert.rejects(runPipeline(resolve('dist/palette-worker.js'), '/tmp/unused', 'analogous', 'dark', abort.signal), Cancelled);
+    await assert.rejects(runPipeline(resolve('dist/palette-worker.js'), join(tmpdir(), 'borrowed-light-unused'), 'analogous', 'dark', abort.signal), Cancelled);
     const active = new AbortController();
-    const pending = runPipeline(resolve('dist/palette-worker.js'), '/tmp/unused', 'analogous', 'dark', active.signal);
+    const pending = runPipeline(resolve('dist/palette-worker.js'), join(tmpdir(), 'borrowed-light-unused'), 'analogous', 'dark', active.signal);
     active.abort();
     await assert.rejects(pending, Cancelled);
 });
 test('worker errors and deadlines reject and terminate processing', async context => {
-    await assert.rejects(runPipeline(resolve('dist/nonexistent-worker.js'), '/tmp/unused', 'analogous', 'dark'), /Cannot find module/);
+    await assert.rejects(runPipeline(resolve('dist/nonexistent-worker.js'), join(tmpdir(), 'borrowed-light-unused'), 'analogous', 'dark'), /Cannot find module/);
     context.mock.timers.enable({ apis: ['setTimeout'] });
-    const pending = runPipeline(resolve('dist/palette-worker.js'), '/tmp/unused', 'analogous', 'dark');
+    const pending = runPipeline(resolve('dist/palette-worker.js'), join(tmpdir(), 'borrowed-light-unused'), 'analogous', 'dark');
     context.mock.timers.tick(15000);
     await assert.rejects(pending, /exceeded 15 seconds/);
     context.mock.timers.reset();
@@ -103,4 +103,74 @@ test('report guards raw customizations before contrast calculations and escapes 
     for (const value of ['#11223344', '#abc', 'red', '&lt;img onerror=&quot;bad&quot;&gt;']) { assert.ok(html.includes(`<code>${value}</code>`)); }
     assert.ok(!html.includes('<img'));
     assert.ok(html.includes('Extracted-color contrast matrix'));
+});
+
+test('native fallback round-trip is parent-owned and only runs for unknown formats', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-native-'));
+    const path = join(directory, 'wallpaper.native');
+    const source = Buffer.from('unknown native format');
+    const png = PNG.sync.write(makeImage());
+    await writeFile(path, source);
+    let called = 0;
+    const decoder = async (bytes: Uint8Array, signal: AbortSignal) => {
+        assert.deepEqual(Buffer.from(bytes), source);
+        assert.equal(signal.aborted, false); called++;
+        return png;
+    };
+    const worker = resolve('dist/palette-worker.js');
+    const result = await runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', decoder);
+    assert.ok(result.swatches.length); assert.equal(called, 1);
+    const previews = await runPreviews(worker, { path }, undefined, undefined, 'balanced', decoder);
+    assert.deepEqual(previews.analogous.light, result); assert.equal(called, 2);
+    await writeFile(path, png);
+    await runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', decoder);
+    assert.equal(called, 2, 'portable formats bypass OS helpers');
+    await writeFile(path, Buffer.from([137,80,78,71,13,10,26,10]));
+    await assert.rejects(runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', decoder), /Truncated/);
+    assert.equal(called, 2, 'corrupt known formats do not fall back');
+});
+test('native helper errors, invalid replies and cancellation cannot return a stale palette', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-native-errors-'));
+    const path = join(directory, 'wallpaper.native');
+    await writeFile(path, 'unknown native format');
+    const worker = resolve('dist/palette-worker.js');
+    await assert.rejects(runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', async () => { throw new Error('codec blocked'); }), /codec blocked/);
+    await assert.rejects(runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', async () => Buffer.from('bad reply')), /invalid PNG/);
+    await assert.rejects(runPipeline(worker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', async () => new Uint8Array(64 * 1024 * 1024 + 1)), /size|limit/);
+    const abort = new AbortController();
+    let started!: () => void;
+    const ready = new Promise<void>(resolveReady => { started = resolveReady; });
+    let helperSignal: AbortSignal | undefined;
+    const pending = runPipeline(worker, path, 'analogous', 'light', abort.signal, 'automatic', 'balanced', async (_bytes, signal) => {
+        helperSignal = signal; started();
+        return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('helper cancelled')), { once: true }));
+    });
+    const rejected = assert.rejects(pending, Cancelled);
+    await ready; abort.abort(); await rejected;
+    assert.ok(helperSignal?.aborted);
+});
+
+test('job deadline and worker crashes abort an outstanding native conversion', async context => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-native-stop-'));
+    const path = join(directory, 'image.native');
+    await writeFile(path, 'native format');
+    let helperSignal: AbortSignal | undefined;
+    let started!: () => void;
+    const ready = new Promise<void>(resolveReady => { started = resolveReady; });
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const pending = runPipeline(resolve('dist/palette-worker.js'), path, 'analogous', 'light', undefined, 'automatic', 'balanced', async (_bytes, signal) => {
+        helperSignal = signal; started();
+        return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('stopped')), { once: true }));
+    });
+    const rejected = assert.rejects(pending, /exceeded 15 seconds/);
+    try { await ready; context.mock.timers.tick(15000); await rejected; assert.ok(helperSignal?.aborted); }
+    finally { context.mock.timers.reset(); }
+    const crashedWorker = join(directory, 'crash.cjs');
+    await writeFile(crashedWorker, "const {parentPort}=require('node:worker_threads');parentPort.postMessage({nativeDecode:new Uint8Array([1])});setTimeout(()=>{throw new Error('worker crashed')},500);");
+    const crashState: { signal?: AbortSignal } = {};
+    await assert.rejects(runPipeline(crashedWorker, path, 'analogous', 'light', undefined, 'automatic', 'balanced', async (_bytes, signal) => {
+        crashState.signal = signal;
+        return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('stopped')), { once: true }));
+    }), /worker crashed/);
+    assert.ok(crashState.signal?.aborted);
 });
