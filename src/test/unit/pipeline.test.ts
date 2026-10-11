@@ -1,3 +1,5 @@
+import { parseHexColorCode } from '../../color/code';
+import { generateVariant } from '../../variants';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -77,4 +79,28 @@ test('worker errors and deadlines reject and terminate processing', async contex
     context.mock.timers.tick(15000);
     await assert.rejects(pending, /exceeded 15 seconds/);
     context.mock.timers.reset();
+});
+
+test('worker validates reused swatch colors after structured cloning', async () => {
+    const { Worker } = await import('node:worker_threads');
+    for (const hex of ['#abc', '#12345678', 'red', '#xyz123']) {
+        const reply = await new Promise<{ error: string }>((resolveReply, reject) => {
+            const worker = new Worker(resolve('dist/palette-worker.js'), { workerData: { swatches: [{ hex, weight: 1 }], harmony: 'analogous', appearance: 'light' } });
+            worker.once('message', resolveReply);
+            worker.once('error', reject);
+        });
+        assert.match(reply.error, /Invalid opaque hex color/);
+    }
+});
+
+test('report guards raw customizations before contrast calculations and escapes unsupported formats', async () => {
+    const result = generateVariant([{ hex: parseHexColorCode('#2244bb'), weight: 1 }], 'analogous', 'light');
+    const html = reportHtml(result, { uri: 'file:///wallpaper.png', provider: 'test', appearance: 'light' }, 'analogous', [], {
+        'editor.background': '#Ab12CD', 'editor.foreground': '#11223344',
+        'button.background': '#abc', 'button.foreground': 'red', 'input.foreground': '<img onerror="bad">',
+    });
+    assert.ok(html.includes('background:#Ab12CD;color:'));
+    for (const value of ['#11223344', '#abc', 'red', '&lt;img onerror=&quot;bad&quot;&gt;']) { assert.ok(html.includes(`<code>${value}</code>`)); }
+    assert.ok(!html.includes('<img'));
+    assert.ok(html.includes('Extracted-color contrast matrix'));
 });

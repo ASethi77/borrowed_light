@@ -10,9 +10,11 @@ Borrowed Light separates desktop wallpaper discovery from image processing, colo
 | [src/model.ts](src/model.ts) | Provider contracts, palette/theme data, preferences, and contrast policy |
 | [src/providers.ts](src/providers.ts) | Desktop detection, wallpaper discovery, and change notifications |
 | [src/pipeline.ts](src/pipeline.ts), [src/palette-worker.ts](src/palette-worker.ts) | Worker lifecycle and image decoding |
-| [src/colors.ts](src/colors.ts) | Palette extraction, harmony recipes, and contrast calculations |
+| [src/color/code.ts](src/color/code.ts), [src/color/conversion.ts](src/color/conversion.ts) | Validated hex colors and the Culori/OKLCH adapter |
+| [src/color/extraction.ts](src/color/extraction.ts) | Sampling, opacity-weighted histogram, and median-cut swatches |
+| [src/color/harmony.ts](src/color/harmony.ts), [src/color/contrast.ts](src/color/contrast.ts) | Harmony recipes, luminance/contrast, and readability search |
 | [src/primary.ts](src/primary.ts), [src/variants.ts](src/variants.ts) | Primary-color choices and rule/appearance combinations |
-| [src/syntax.ts](src/syntax.ts), [src/theme.ts](src/theme.ts) | Syntax palettes, semantic roles, workbench colors, and readability adjustments |
+| [src/color/syntax.ts](src/color/syntax.ts), [src/color/theme.ts](src/color/theme.ts) | Syntax palettes, semantic roles, workbench colors, and readability adjustments |
 | [src/preview.ts](src/preview.ts) | Live QuickPick previews and session caching |
 | [src/application.ts](src/application.ts), [src/ownership.ts](src/ownership.ts) | Configuration writes, ownership tracking, rollback, and restoration |
 | [src/report.ts](src/report.ts) | Read-only palette and contrast report |
@@ -73,9 +75,17 @@ The worker accepts regular JPEG/PNG files up to 64 MiB and 32 megapixels. It has
 
 Images are interpreted as sRGB without embedded ICC color management. Transparent pixels are ignored and partially transparent samples are opacity-weighted. Extraction reads the configured image rather than capturing the desktop, so it does not model monitor cropping, overlays, multi-monitor composition, or live transitions.
 
+## Color representations and boundaries
+
+Related calculations live under `src/color/`. `HexColorCode` is a branded string representing exactly an opaque `#RRGGBB` sRGB value. `parseHexColorCode()` validates boundary values, and `isHexColorCode()` narrows unknown values. Accepted spelling is preserved. Shorthand, alpha channels, named colors, and malformed values are excluded from calculations. Brands add no JSON fields and remain ordinary strings in worker messages and VS Code settings.
+
+`toOklch()` and `fromOklch()` exchange an `OklchColor` with named `lightness`, `chroma`, and `hueDegrees` coordinates. Culori's abbreviated coordinates stay inside the conversion adapter. Supplied worker swatches are validated after structured cloning. The report validates raw customization colors separately; unsupported formats are shown as escaped text rather than measured as opaque colors.
+
+Policy constants are grouped beside the algorithms they govern. WCAG coefficients and thresholds are distinguished from custom visual choices such as sampling bounds, recipe stops, hue separation, and saturation limits. Syntax generation returns named family colors instead of numeric slots.
+
 ## Color extraction and harmony
 
-Extraction uses a deterministic, opacity-weighted [median-cut quantizer](https://en.wikipedia.org/wiki/Median_cut) over a bounded, regularly sampled RGB histogram. It returns up to eight representative swatches ordered by sample weight. The first sufficiently chromatic swatch with at least 1% weight seeds the harmony; otherwise, the harmony remains neutral.
+Extraction uses a deterministic, opacity-weighted [median-cut quantizer](https://en.wikipedia.org/wiki/Median_cut) over a bounded, regularly sampled RGB histogram. `extractRepresentativeColors()` builds five-bit RGB bins on a regular grid targeting 65,536 samples. It splits the box with the largest channel range × opacity mass at its weighted median, using stable channel/box ordering to resolve ties. Rounded RGB centroids with the same hex value are merged. It returns up to eight representative swatches ordered by sample weight. `generateHarmonyPalette()` uses the first sufficiently chromatic swatch with at least 1% weight seeds the harmony; otherwise, the harmony remains neutral.
 
 Recipes use **OKLCH**: lightness, chroma, and hue angle, the cylindrical representation of Oklab. This separates hue changes from tonal adjustments. Colors outside sRGB reduce chroma to fit the gamut. See [Oklab and OKLCH](https://en.wikipedia.org/wiki/Oklab_color_space) for background and the [W3C CSS Color specification](https://www.w3.org/TR/css-color-4/#ok-lab) for the color-space definition.
 
@@ -117,7 +127,7 @@ Readability uses the WCAG relative-luminance contrast ratio, distinct from visua
 
 The current `balancedPolicy` targets **4.5:1** for primary/secondary text, comments, syntax categories, buttons, and field text against their assigned backgrounds. Essential focus indicators target **3:1**, informed by [W3C non-text contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 
-`readable()` searches for the nearest passing OKLCH lightness while retaining the source hue/chroma where gamut permits. It checks the final quantized 8-bit sRGB hex values against every background assigned to that role. Black/white are fallbacks; an impossible assignment raises an error rather than silently returning a failing color.
+`ensureReadableColor()` searches for the nearest passing OKLCH lightness while retaining the source hue/chroma where gamut permits. It checks the final quantized 8-bit sRGB hex values against every background assigned to that role. The search visits 1,001 lightness values from 0 to 1; strict distance comparisons retain the earlier (darker) candidate on equal distances. This search resolution is a custom policy. Black/white are fallbacks; an impossible assignment raises an error rather than silently returning a failing color.
 
 The report shows pairwise contrast matrices for extracted/harmony palettes, role adjustments, and foreground/background checks. An arbitrary pair of palette colors has no universal pass/fail requirement; its assigned UI role determines the target.
 

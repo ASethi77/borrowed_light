@@ -1,17 +1,18 @@
+import { HexColorCode, isHexColorCode, parseHexColorCode } from './color/code';
 import { randomBytes } from 'node:crypto';
-import { contrast, matrix } from './colors';
+import { contrastRatio, contrastMatrix, normalTextContrast } from './color/contrast';
 import { Harmony, PaletteResult, Wallpaper } from './model';
 
 const escape = (value: unknown): string => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 export function reportHtml(result: PaletteResult, wallpaper: Wallpaper, harmony: Harmony, warnings: string[], configured: Record<string, string> = {}): string {
     const nonce = randomBytes(16).toString('hex');
-    const swatch = (hex: string) => `<span class="swatch" style="background:${escape(hex)};color:${contrast(hex, '#ffffff') >= 4.5 ? '#ffffff' : '#000000'}">${escape(hex)}</span>`;
-    const table = (colors: string[]) => {
-        const ratios = matrix(colors);
-        return `<div class="scroll"><table><caption>Pairwise WCAG contrast ratios (arbitrary pairs have no universal pass/fail threshold)</caption><thead><tr><th>Color</th>${colors.map(c => `<th>${swatch(c)}</th>`).join('')}</tr></thead><tbody>${colors.map((c, i) => `<tr><th>${swatch(c)}</th>${ratios[i].map(r => `<td>${r.toFixed(2)}:1</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    const swatch = (hex: HexColorCode) => `<span class="swatch" style="background:${escape(hex)};color:${contrastRatio(hex, parseHexColorCode('#ffffff')) >= normalTextContrast ? '#ffffff' : '#000000'}">${escape(hex)}</span>`;
+    const table = (colors: HexColorCode[]) => {
+        const ratios = contrastMatrix(colors);
+        return `<div class="scroll"><table><caption>Pairwise WCAG contrast ratios (arbitrary pairs have no universal pass/fail threshold)</caption><thead><tr><th>Color</th>${colors.map(colorCode => `<th>${swatch(colorCode)}</th>`).join('')}</tr></thead><tbody>${colors.map((colorCode, rowIndex) => `<tr><th>${swatch(colorCode)}</th>${ratios[rowIndex].map(ratio => `<td>${ratio.toFixed(2)}:1</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     };
     const differences = Object.entries(configured).filter(([key, value]) => value !== result.theme.colors[key]);
-    const showConfigured = (value: string) => /^#[\da-f]{6}$/i.test(value) ? swatch(value) : `<code>${escape(value)}</code>`;
+    const showConfigured = (value: string) => isHexColorCode(value) ? swatch(value) : `<code>${escape(value)}</code>`;
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; style-src-attr 'unsafe-inline';"><title>Borrowed Light: palette and contrast</title><style nonce="${nonce}">
     body{font:14px/1.6 var(--vscode-font-family),sans-serif;color:var(--vscode-foreground);background:var(--vscode-editor-background);padding:24px;max-width:1200px;margin:auto}h1{font-size:24px}h2{font-size:19px;margin-top:28px}.swatch{display:inline-block;padding:7px 9px;border-radius:4px;font:12px monospace;border:1px solid var(--vscode-widget-border)}table{border-collapse:collapse;width:100%;margin:12px 0}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--vscode-widget-border)}caption{text-align:left;margin-bottom:8px}.scroll{overflow:auto}.warning{border-left:3px solid var(--vscode-editorWarning-foreground);padding-left:12px}.pass{font-weight:bold}code{overflow-wrap:anywhere}.palette{display:flex;gap:10px;flex-wrap:wrap}.small{opacity:.85}details{margin:16px 0}
     </style></head><body><h1>Borrowed Light: palette and contrast</h1><p><strong>Source:</strong> <code>${escape(wallpaper.uri)}</code><br><strong>Provider:</strong> ${escape(wallpaper.provider)} · <strong>Harmony:</strong> ${escape(harmony)} · <strong>Theme:</strong> ${escape(result.theme.appearance)} · <strong>Primary:</strong> ${escape(result.primary.label)} ${escape(result.primary.hex)} · <strong>Syntax:</strong> ${escape(result.syntaxStyle)} · <strong>Policy:</strong> balanced</p>

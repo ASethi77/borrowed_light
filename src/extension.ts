@@ -7,7 +7,7 @@ import { isPrimaryChoice } from './primary';
 import { createPreviewPicker, PreviewPicker } from './preview';
 import { selectProvider, wallpaperPath } from './providers';
 import { reportHtml } from './report';
-import { themeNames } from './theme';
+import { themeNames } from './color/theme';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const output = vscode.window.createOutputChannel('Borrowed Light');

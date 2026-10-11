@@ -1,8 +1,9 @@
+import { parseHexColorCode } from './color/code';
 import { parentPort, workerData } from 'node:worker_threads';
 import { open } from 'node:fs/promises';
 import * as jpeg from 'jpeg-js';
 import { PNG } from 'pngjs';
-import { extract } from './colors';
+import { extractRepresentativeColors } from './color/extraction';
 import { PipelineInput } from './model';
 import { generateVariant, generateVariants } from './variants';
 
@@ -43,11 +44,13 @@ if (parentPort) {
     const input = workerData as PipelineInput;
     void (async () => {
         try {
-            let swatches = input.swatches;
+            // Structured cloning carries plain strings, not a runtime brand. Validate supplied
+            // colors before allowing reused previews into conversion/contrast calculations.
+            let swatches = input.swatches?.map(swatch => ({ ...swatch, hex: parseHexColorCode(swatch.hex) }));
             if (!swatches) {
                 if (!input.path) { throw new Error('No wallpaper source'); }
                 const image = await decodeImage(input.path);
-                swatches = extract(image.data, image.width, image.height);
+                swatches = extractRepresentativeColors(image.data, image.width, image.height);
             }
             port.postMessage({ result: input.previews ? generateVariants(swatches, input.primaries, input.syntaxStyle) : generateVariant(swatches, input.harmony!, input.appearance!, input.primary, input.syntaxStyle) });
         } catch (error) { port.postMessage({ error: error instanceof Error ? error.message : String(error) }); }

@@ -39,7 +39,7 @@ npm run test:unit
 npm run test:host
 ```
 
-Run the unit command first: it builds the bundles, compiles tests to `out/`, and runs the Node.js unit suite. The suite covers extraction, harmony/contrast behavior, syntax diversity, worker processing/cancellation, provider parsing, and ownership restoration. If bundles are already built and only host tests changed, `npm run compile-tests` refreshes the compiled tests.
+Run the unit command first: it builds the bundles, compiles tests to `out/`, and runs the Node.js unit suite. The suite covers extraction, harmony/contrast behavior, syntax diversity, worker processing/cancellation, provider parsing, and ownership restoration. Compile-only checks enforce the validated color contract. `color-regression.test.ts` fingerprints 768 complete theme variants captured before the color refactor and compares extraction fixtures; update those baselines only when intentionally changing generated output. If bundles are already built and only host tests changed, `npm run compile-tests` refreshes the compiled tests.
 
 Host tests run in an isolated VS Code profile and exercise commands, live configuration, previews, persistence/restoration, and real language grammar scopes. The [test configuration](.vscode-test.mjs) selects the test files and launch options. `npm test` runs both suites in order.
 

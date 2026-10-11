@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Appearance, GeneratedTheme, Harmony, PrimaryChoices, SyntaxStyle } from './model';
 import { Ledger, Values, equal, mergeOwned, restoreOwned } from './ownership';
-import { themeNames } from './theme';
+import { themeNames } from './color/theme';
 
 const ledgerKey = 'themeOwnership.v1';
 const previewKey = 'themePreview.v1';

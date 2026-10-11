@@ -1,3 +1,4 @@
+import { parseHexColorCode } from '../color/code';
 import assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { execFile } from 'node:child_process';
@@ -6,7 +7,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { customizationSections } from '../application';
-import { contrast } from '../colors';
+import { contrastRatio } from '../color/contrast';
 import { Values } from '../ownership';
 
 suite('GNOME wallpaper smoke test', () => {
@@ -66,9 +67,9 @@ suite('GNOME wallpaper smoke test', () => {
                 const theme = `Borrowed Light (${appearance === 'dark' ? 'Dark' : 'Light'})`;
                 assert.equal(vscode.workspace.getConfiguration().get('workbench.colorTheme'), theme);
                 const colors = vscode.workspace.getConfiguration().inspect<Values>('workbench.colorCustomizations')!.globalValue![`[${theme}]`] as Record<string, string>;
-                assert.ok(contrast(colors['editor.foreground'], colors['editor.background']) >= 4.5);
-                assert.ok(contrast(colors['button.foreground'], colors['button.background']) >= 4.5);
-                assert.ok(contrast(colors['input.foreground'], colors['input.background']) >= 4.5);
+                assert.ok(contrastRatio(parseHexColorCode(colors['editor.foreground']), parseHexColorCode(colors['editor.background'])) >= 4.5);
+                assert.ok(contrastRatio(parseHexColorCode(colors['button.foreground']), parseHexColorCode(colors['button.background'])) >= 4.5);
+                assert.ok(contrastRatio(parseHexColorCode(colors['input.foreground']), parseHexColorCode(colors['input.background'])) >= 4.5);
                 for (const [language, content] of [
                     ['typescript', '// Wallpaper theme\ninterface Color { hex: string }\nconst count = 42;\nfunction greet(name: string) { return `Hello ${name}`; }'],
                     ['python', '# Wallpaper theme\ndef greet(name: str):\n    return f"Hello {name}"\ncount = 42'],

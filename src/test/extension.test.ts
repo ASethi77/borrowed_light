@@ -1,7 +1,8 @@
+import { parseHexColorCode } from '../color/code';
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { ThemeApplication, customizationSections } from '../application';
-import { generateTheme, themeNames, themeLabels } from '../theme';
+import { generateTheme, themeNames, themeLabels } from '../color/theme';
 import { Values } from '../ownership';
 import { generateVariant, generateVariants } from '../variants';
 import { createPreviewPicker } from '../preview';
@@ -24,7 +25,7 @@ class Memory implements vscode.Memento {
         else { this.values[key] = JSON.parse(JSON.stringify(value)); }
     }
 }
-const palette = ['#5a8cab','#d79e63','#8eb886','#bd88c7','#bf7272'];
+const palette = ['#5a8cab', '#d79e63', '#8eb886', '#bd88c7', '#bf7272'].map(parseHexColorCode);
 suite('Borrowed Light extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
     const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle'];
@@ -123,7 +124,7 @@ suite('Borrowed Light extension host', () => {
     test('native picker previews keyboard navigation and Escape restores the starting theme', async () => {
         const app = new ThemeApplication(new Memory());
         const before = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
-        const variants = generateVariants([{ hex: '#2288bb', weight: 1 }]);
+        const variants = generateVariants([{ hex: parseHexColorCode('#2288bb'), weight: 1 }]);
         let writes = Promise.resolve();
         const errors: unknown[] = [];
         const picker = createPreviewPicker({
@@ -156,7 +157,7 @@ suite('Borrowed Light extension host', () => {
     });
     test('native picker Enter keeps the last navigated rule and appearance', async () => {
         const app = new ThemeApplication(new Memory());
-        const variants = generateVariants([{ hex: '#bb4422', weight: 1 }]);
+        const variants = generateVariants([{ hex: parseHexColorCode('#bb4422'), weight: 1 }]);
         let writes = Promise.resolve();
         const errors: unknown[] = [];
         const picker = createPreviewPicker({
@@ -186,7 +187,7 @@ suite('Borrowed Light extension host', () => {
     });
     test('primary cycling previews wallpaper highlights and remembers separate light/dark choices', async () => {
         const app = new ThemeApplication(new Memory());
-        const swatches = [{ hex: '#229944', weight: 0.7 }, { hex: '#2266cc', weight: 0.15 }, { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 }];
+        const swatches = [{ hex: parseHexColorCode('#229944'), weight: 0.7 }, { hex: parseHexColorCode('#2266cc'), weight: 0.15 }, { hex: parseHexColorCode('#eedd22'), weight: 0.1 }, { hex: parseHexColorCode('#cc3322'), weight: 0.05 }];
         const variants = generateVariants(swatches);
         let writes = Promise.resolve();
         const errors: unknown[] = [];
@@ -226,7 +227,7 @@ suite('Borrowed Light extension host', () => {
     });
     test('syntax styles preview live, preserve light/primary colors, save on Enter, and revert on Escape', async () => {
         const app = new ThemeApplication(new Memory());
-        const swatches = [{ hex: '#229944', weight: 0.7 }, { hex: '#2266cc', weight: 0.15 }, { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 }];
+        const swatches = [{ hex: parseHexColorCode('#229944'), weight: 0.7 }, { hex: parseHexColorCode('#2266cc'), weight: 0.15 }, { hex: parseHexColorCode('#eedd22'), weight: 0.1 }, { hex: parseHexColorCode('#cc3322'), weight: 0.05 }];
         const primaries = { light: 'wallpaper-2', dark: 'wallpaper-1' } as const;
         const directory = await mkdtemp(join(tmpdir(), 'wallpaper-syntax-'));
         const path = join(directory, 'preview.ts');
@@ -315,7 +316,7 @@ suite('Borrowed Light extension host', () => {
         assert.ok(tokens?.some(token => token.c.includes('not a template') && token.t.includes('comment.line') && !token.t.includes('meta.embedded.block.html')));
         try {
             await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
-            const swatches = [{ hex: '#697663', weight: 1 }];
+            const swatches = [{ hex: parseHexColorCode('#697663'), weight: 1 }];
             for (const mode of ['light', 'dark'] as const) {
                 await app.apply(generateVariant(swatches, 'complementary', mode, 'harmony-1', 'vibrant').theme);
                 if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
@@ -327,7 +328,7 @@ suite('Borrowed Light extension host', () => {
     });
     test('green-wallpaper vibrant highlighting distinguishes real Python scopes without semantic tokens', async () => {
         const app = new ThemeApplication(new Memory());
-        const swatches = ['#34402f', '#100d0a', '#4a5033', '#2a2e22', '#505d3f', '#8f931e', '#3d5039', '#91975c'].map(hex => ({ hex, weight: 1 / 8 }));
+        const swatches = [parseHexColorCode('#34402f'), parseHexColorCode('#100d0a'), parseHexColorCode('#4a5033'), parseHexColorCode('#2a2e22'), parseHexColorCode('#505d3f'), parseHexColorCode('#8f931e'), parseHexColorCode('#3d5039'), parseHexColorCode('#91975c')].map(hex => ({ hex, weight: 1 / 8 }));
         const fixture = join(await mkdtemp(join(tmpdir(), 'wallpaper-python-')), 'sweep.py');
         await writeFile(fixture, '# Green wallpaper, diverse syntax families\n'.repeat(10) + 'from math import sin\n\nclass Signal:\n    def sweep(self, frequency: float, count: int = 20) -> str:\n        label = "frequency sweep"\n        phase = 2.0 * frequency\n        return str(sin(phase))\n\nresponse = Signal().sweep(100.0)\nprint(response)\n');
         const uri = vscode.Uri.file(fixture);
