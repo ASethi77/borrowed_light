@@ -77,7 +77,7 @@ export class GnomeProvider implements WallpaperProvider {
 export class UnsupportedProvider implements WallpaperProvider {
     readonly id = 'unsupported';
     async available(): Promise<boolean> { return true; }
-    async current(): Promise<Wallpaper> { throw new Error('Wallpaper Paste currently supports local Fedora/GNOME sessions. This desktop has no wallpaper provider yet.'); }
+    async current(): Promise<Wallpaper> { throw new Error('Borrowed Light currently supports local Fedora/GNOME sessions. This desktop has no wallpaper provider yet.'); }
 }
 
 export interface ProviderRegistration { matches(platform: NodeJS.Platform, desktop: string): boolean; create(): WallpaperProvider }

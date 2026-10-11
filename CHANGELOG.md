@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.8
+
+- Use Borrowed Light branding throughout the extension UI and documentation.
+- Use `borrowed-light-local.borrowed-light` as the extension ID and `borrowed-light.*` for commands and settings.
+
 ## 0.0.7
 
 - Recognize HTML documents in ordinary and raw Python triple-quoted strings, including embedded JavaScript and CSS.
@@ -21,7 +26,7 @@
 
 ## 0.0.4
 
-- Start previews from the active Wallpaper Paste Light/Dark theme, preserving its appearance while cycling rules even when the saved preference differs.
+- Start previews from the active Borrowed Light light/dark theme, preserving its appearance while cycling rules even when the saved preference differs.
 
 ## 0.0.3
 

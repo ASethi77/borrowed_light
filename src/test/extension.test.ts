@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { ThemeApplication, customizationSections } from '../application';
-import { generateTheme, themeNames } from '../theme';
+import { generateTheme, themeNames, themeLabels } from '../theme';
 import { Values } from '../ownership';
 import { generateVariant, generateVariants } from '../variants';
 import { createPreviewPicker } from '../preview';
@@ -25,9 +25,9 @@ class Memory implements vscode.Memento {
     }
 }
 const palette = ['#5a8cab','#d79e63','#8eb886','#bd88c7','#bf7272'];
-suite('Wallpaper Paste extension host', () => {
+suite('Borrowed Light extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
-    const sections = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.autoSync', 'wallpaper-paste.harmony', 'wallpaper-paste.appearance', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight', 'wallpaper-paste.syntaxStyle'];
+    const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle'];
     let originals: Record<string, unknown>;
     setup(() => {
         originals = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
@@ -36,12 +36,15 @@ suite('Wallpaper Paste extension host', () => {
         for (const section of sections) { await config().update(section, originals[section], vscode.ConfigurationTarget.Global); }
     });
     test('extension loads with all four commands and both theme contributions', async () => {
-        const extension = vscode.extensions.getExtension('wallpaper-paste-local.wallpaper-paste');
+        const extension = vscode.extensions.getExtension('borrowed-light-local.borrowed-light');
         assert.ok(extension);
         await extension.activate();
+        assert.equal(extension.packageJSON.displayName, 'Borrowed Light');
         const commands = await vscode.commands.getCommands(true);
-        for (const name of ['sync', 'report', 'restore', 'preview']) { assert.ok(commands.includes(`wallpaper-paste.${name}`)); }
-        assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { label: string }) => theme.label), Object.values(themeNames));
+        for (const name of ['sync', 'report', 'restore', 'preview']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
+        assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { label: string }) => theme.label), Object.values(themeLabels));
+        assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { id: string }) => theme.id), Object.values(themeNames));
+        assert.ok(extension.packageJSON.contributes.commands.every((command: { title: string }) => command.title.startsWith('Borrowed Light:')));
     });
     test('live customization merge and restart-safe restoration preserve unrelated settings', async () => {
         const original = { '[Other]': { 'editor.background': '#123456' } };
@@ -63,13 +66,13 @@ suite('Wallpaper Paste extension host', () => {
         const application = new ThemeApplication(new Memory());
         await application.apply(generateTheme(palette, 'dark'));
         const colors = config().inspect<Values>('workbench.colorCustomizations')!.globalValue!;
-        const block = colors['[Wallpaper Paste Dark]'] as Values;
+        const block = colors['[Borrowed Light (Dark)]'] as Values;
         block['editor.background'] = '#123456';
         await config().update('workbench.colorCustomizations', colors, vscode.ConfigurationTarget.Global);
         await config().update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
         await application.restore();
         assert.equal(config().get('workbench.colorTheme'), 'Default Dark Modern');
-        assert.deepEqual(config().inspect('workbench.colorCustomizations')?.globalValue, { '[Wallpaper Paste Dark]': { 'editor.background': '#123456' } });
+        assert.deepEqual(config().inspect('workbench.colorCustomizations')?.globalValue, { '[Borrowed Light (Dark)]': { 'editor.background': '#123456' } });
     });
     test('a failed apply rolls back successful writes and its ownership journal', async () => {
         const memory = new Memory(); memory.failAt = 2;
@@ -98,8 +101,8 @@ suite('Wallpaper Paste extension host', () => {
         await app.beginPreview();
         await app.apply(generateTheme(palette, 'light'));
         await app.commitPreview('triad', 'light');
-        assert.equal(config().get('wallpaper-paste.harmony'), 'triad');
-        assert.equal(config().get('wallpaper-paste.appearance'), 'light');
+        assert.equal(config().get('borrowed-light.harmony'), 'triad');
+        assert.equal(config().get('borrowed-light.appearance'), 'light');
         assert.equal(app.active, themeNames.light);
         await app.restore();
         for (const section of customizationSections) { assert.deepEqual(config().inspect(section)?.globalValue, before[section]); }
@@ -109,12 +112,12 @@ suite('Wallpaper Paste extension host', () => {
         await app.beginPreview();
         await app.apply(generateTheme(palette, 'light'));
         const colors = config().inspect<Values>('workbench.colorCustomizations')!.globalValue!;
-        (colors['[Wallpaper Paste Light]'] as Values)['editor.background'] = '#abcdef';
+        (colors['[Borrowed Light (Light)]'] as Values)['editor.background'] = '#abcdef';
         await config().update('workbench.colorCustomizations', colors, vscode.ConfigurationTarget.Global);
         await config().update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
         await app.finishPreview(false);
         assert.equal(app.active, 'Default Dark Modern');
-        assert.equal((config().inspect<Values>('workbench.colorCustomizations')!.globalValue!['[Wallpaper Paste Light]'] as Values)['editor.background'], '#abcdef');
+        assert.equal((config().inspect<Values>('workbench.colorCustomizations')!.globalValue!['[Borrowed Light (Light)]'] as Values)['editor.background'], '#abcdef');
         assert.equal(app.ledger, undefined);
     });
     test('native picker previews keyboard navigation and Escape restores the starting theme', async () => {
@@ -133,7 +136,7 @@ suite('Wallpaper Paste extension host', () => {
             while (!predicate() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
             assert.ok(predicate());
         };
-        const colors = () => (config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Wallpaper Paste Light]'] as Values | undefined);
+        const colors = () => (config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Borrowed Light (Light)]'] as Values | undefined);
         try {
             await wait(() => app.active === themeNames.light);
             await vscode.commands.executeCommand('workbench.action.quickOpenSelectNext');
@@ -141,9 +144,9 @@ suite('Wallpaper Paste extension host', () => {
             picker.cyclePrimary();
             picker.toggleAppearance();
             await wait(() => app.active === themeNames.dark);
-            if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+            if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
                 await new Promise(resolve => setTimeout(resolve, 500));
-                await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/picker.png`]);
+                await promisify(execFile)('import', ['-window', 'root', `${process.env.BORROWED_LIGHT_SCREENSHOT_DIR}/picker.png`]);
             }
             await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
             assert.equal(await picker.closed, undefined);
@@ -163,7 +166,7 @@ suite('Wallpaper Paste extension host', () => {
         });
         try {
             const waitFor = async (rule: 'analogous' | 'monochromatic' | 'triad') => {
-                const matches = () => app.active === themeNames.dark && JSON.stringify(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Wallpaper Paste Dark]']) === JSON.stringify(variants[rule].dark.theme.colors);
+                const matches = () => app.active === themeNames.dark && JSON.stringify(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Borrowed Light (Dark)]']) === JSON.stringify(variants[rule].dark.theme.colors);
                 const deadline = Date.now() + 10000;
                 while (!matches() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
                 assert.ok(matches(), `preview reaches ${rule}`);
@@ -176,8 +179,8 @@ suite('Wallpaper Paste extension host', () => {
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
             assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced' });
-            assert.equal(config().get('wallpaper-paste.harmony'), 'triad');
-            assert.equal(config().get('wallpaper-paste.appearance'), 'dark');
+            assert.equal(config().get('borrowed-light.harmony'), 'triad');
+            assert.equal(config().get('borrowed-light.appearance'), 'dark');
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); }
     });
@@ -210,14 +213,14 @@ suite('Wallpaper Paste extension host', () => {
             await waitFor('light', 'wallpaper-1');
             picker.toggleAppearance();
             await waitFor('dark', 'wallpaper-2');
-            if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+            if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
                 await new Promise(resolve => setTimeout(resolve, 500));
-                await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/primary-picker.png`]);
+                await promisify(execFile)('import', ['-window', 'root', `${process.env.BORROWED_LIGHT_SCREENSHOT_DIR}/primary-picker.png`]);
             }
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
             assert.deepEqual((await picker.closed)?.primaries, { dark: 'wallpaper-2', light: 'wallpaper-1' });
-            assert.equal(config().get('wallpaper-paste.primaryDark'), 'wallpaper-2');
-            assert.equal(config().get('wallpaper-paste.primaryLight'), 'wallpaper-1');
+            assert.equal(config().get('borrowed-light.primaryDark'), 'wallpaper-2');
+            assert.equal(config().get('borrowed-light.primaryLight'), 'wallpaper-1');
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); }
     });
@@ -244,14 +247,14 @@ suite('Wallpaper Paste extension host', () => {
         const waitFor = async (style: 'mellow' | 'balanced' | 'vibrant' | 'vibrant-alt') => {
             const expected = generateVariant(swatches, 'analogous', 'light', primaries.light, style).theme;
             // Reopening a picker can already match the previous theme before preparation finishes.
-            const matches = () => previewReady && app.active === themeNames.light && JSON.stringify((config().inspect<Values>('editor.semanticTokenColorCustomizations')?.globalValue?.['[Wallpaper Paste Light]'] as Values | undefined)?.rules) === JSON.stringify(expected.semanticRules);
+            const matches = () => previewReady && app.active === themeNames.light && JSON.stringify((config().inspect<Values>('editor.semanticTokenColorCustomizations')?.globalValue?.['[Borrowed Light (Light)]'] as Values | undefined)?.rules) === JSON.stringify(expected.semanticRules);
             const deadline = Date.now() + 10000;
             while (!matches() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
             assert.ok(matches(), style);
-            assert.deepEqual(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Wallpaper Paste Light]'], expected.colors);
-            if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+            assert.deepEqual(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Borrowed Light (Light)]'], expected.colors);
+            if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
                 await new Promise(resolve => setTimeout(resolve, 500));
-                await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/syntax-${style}.png`]);
+                await promisify(execFile)('import', ['-window', 'root', `${process.env.BORROWED_LIGHT_SCREENSHOT_DIR}/syntax-${style}.png`]);
             }
         };
         let picker = start('balanced');
@@ -261,7 +264,7 @@ suite('Wallpaper Paste extension host', () => {
             picker.cycleSyntax(); picker.cycleSyntax(); await waitFor('vibrant');
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
             assert.equal((await picker.closed)?.syntaxStyle, 'vibrant');
-            assert.equal(config().get('wallpaper-paste.syntaxStyle'), 'vibrant');
+            assert.equal(config().get('borrowed-light.syntaxStyle'), 'vibrant');
             const baseline = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
             picker = start('vibrant'); await waitFor('vibrant');
             picker.cycleSyntax(); await waitFor('vibrant-alt');
@@ -315,9 +318,9 @@ suite('Wallpaper Paste extension host', () => {
             const swatches = [{ hex: '#697663', weight: 1 }];
             for (const mode of ['light', 'dark'] as const) {
                 await app.apply(generateVariant(swatches, 'complementary', mode, 'harmony-1', 'vibrant').theme);
-                if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
-                    await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/embedded-${mode}.png`]);
+                    await promisify(execFile)('import', ['-window', 'root', `${process.env.BORROWED_LIGHT_SCREENSHOT_DIR}/embedded-${mode}.png`]);
                 }
             }
         } finally { await app.restore(); await vscode.commands.executeCommand('workbench.action.closeAllEditors'); }
@@ -346,9 +349,9 @@ suite('Wallpaper Paste extension host', () => {
                 const rules = (config().inspect<Values>('editor.tokenColorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`] as { textMateRules: typeof result.theme.textMateRules }).textMateRules;
                 const colors = ['storage', 'entity.name.function', 'support.type', 'string', 'constant.numeric'].map(scope => rules.find(rule => rule.scope.includes(scope))!.settings.foreground);
                 assert.equal(new Set(colors).size, 5);
-                if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                if (process.env.BORROWED_LIGHT_SCREENSHOT_DIR) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
-                    await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/python-${mode}.png`]);
+                    await promisify(execFile)('import', ['-window', 'root', `${process.env.BORROWED_LIGHT_SCREENSHOT_DIR}/python-${mode}.png`]);
                 }
             }
         } finally {

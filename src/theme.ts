@@ -2,7 +2,8 @@ import { color, contrast, lch, readable } from './colors';
 import { syntaxColors } from './syntax';
 import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle } from './model';
 
-export const themeNames = { dark: 'Wallpaper Paste Dark', light: 'Wallpaper Paste Light' };
+export const themeNames = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
+export const themeLabels = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
 export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: string = palette[2], syntaxStyle: SyntaxStyle = 'balanced'): GeneratedTheme {
     if (palette.length !== 5) { throw new Error('Expected five harmony colors'); }
     const seed = lch(primary);

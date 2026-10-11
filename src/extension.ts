@@ -10,7 +10,7 @@ import { reportHtml } from './report';
 import { themeNames } from './theme';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    const output = vscode.window.createOutputChannel('Wallpaper Paste');
+    const output = vscode.window.createOutputChannel('Borrowed Light');
     const provider = await selectProvider();
     const application = new ThemeApplication(context.globalState);
     try { await application.recoverPreview(); } catch (value) { output.appendLine(`Could not restore an interrupted preview: ${String(value)}`); }
@@ -25,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let preview: PreviewPicker | undefined;
     let previewOpening = false;
     const reportWorkers = new Set<AbortController>();
-    const settings = () => vscode.workspace.getConfiguration('wallpaper-paste');
+    const settings = () => vscode.workspace.getConfiguration('borrowed-light');
     const serialized = (action: () => Promise<void>): Promise<void> => {
         const next = writes.then(action);
         writes = next.catch(() => {});
@@ -37,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const message = value instanceof Error ? value.message : String(value);
         if (manual || message !== lastError) { output.appendLine(message); }
         lastError = message;
-        if (manual) { void vscode.window.showErrorMessage(`Wallpaper Paste: ${message}`); }
+        if (manual) { void vscode.window.showErrorMessage(`Borrowed Light: ${message}`); }
     };
     const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; syntaxStyle: SyntaxStyle }> => {
         const config = settings();
@@ -131,15 +131,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         configureMonitoring();
     };
     const previewStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 10);
-    previewStatus.text = '$(symbol-color) Wallpaper';
-    previewStatus.tooltip = 'Preview wallpaper color rules and light/dark appearances';
-    previewStatus.command = 'wallpaper-paste.preview';
+    previewStatus.text = '$(symbol-color) Borrowed Light';
+    previewStatus.tooltip = 'Borrowed Light: Preview color rules, primary hues, syntax colors, and light/dark appearances';
+    previewStatus.command = 'borrowed-light.preview';
     previewStatus.show();
     context.subscriptions.push(output,
         previewStatus,
-        vscode.commands.registerCommand('wallpaper-paste.preview', openPreview),
-        vscode.commands.registerCommand('wallpaper-paste.sync', async () => { await preview?.cancel(); await sync(true); }),
-        vscode.commands.registerCommand('wallpaper-paste.report', async () => {
+        vscode.commands.registerCommand('borrowed-light.preview', openPreview),
+        vscode.commands.registerCommand('borrowed-light.sync', async () => { await preview?.cancel(); await sync(true); }),
+        vscode.commands.registerCommand('borrowed-light.report', async () => {
             await preview?.cancel();
             const reportAbort = new AbortController();
             reportWorkers.add(reportAbort);
@@ -148,13 +148,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 const result = cached?.signature === source.signature ? cached.result : await runPipeline(workerPath, source.path, source.harmony, source.appearance, reportAbort.signal, source.primaries[source.appearance], source.syntaxStyle);
                 if (disposed) { return; }
                 cached = { signature: source.signature, result };
-                const panel = vscode.window.createWebviewPanel('wallpaperPasteReport', 'Wallpaper Palette & Contrast', vscode.ViewColumn.Beside, { enableScripts: false, localResourceRoots: [] });
+                const panel = vscode.window.createWebviewPanel('borrowedLightReport', 'Borrowed Light: Palette & Contrast', vscode.ViewColumn.Beside, { enableScripts: false, localResourceRoots: [] });
                 context.subscriptions.push(panel);
                 panel.webview.html = reportHtml(result, source.wallpaper, source.harmony, application.overrideWarnings(result.theme), application.configuredColors(result.theme));
             } catch (value) { error(value, true); }
             finally { reportWorkers.delete(reportAbort); }
         }),
-        vscode.commands.registerCommand('wallpaper-paste.restore', async () => {
+        vscode.commands.registerCommand('borrowed-light.restore', async () => {
             await preview?.cancel();
             cancel(); stop();
             try {
@@ -167,7 +167,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             } catch (value) { error(value, true); }
         }),
         vscode.workspace.onDidChangeConfiguration(event => {
-            if (event.affectsConfiguration('wallpaper-paste')) { cancel(); signature = ''; configureMonitoring(); }
+            if (event.affectsConfiguration('borrowed-light')) { cancel(); signature = ''; configureMonitoring(); }
             else if (event.affectsConfiguration('workbench.colorTheme')) {
                 if (!application.ownedThemeActive) { cancel(); void preview?.cancel(); }
                 else { schedule(); }

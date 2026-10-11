@@ -59,7 +59,7 @@ export class ThemeApplication {
     }
     async commitPreview(harmony: Harmony, appearance: Appearance, primaries?: PrimaryChoices, syntaxStyle?: SyntaxStyle): Promise<void> {
         try {
-            for (const [key, written] of Object.entries({ 'wallpaper-paste.harmony': harmony, 'wallpaper-paste.appearance': appearance, ...(syntaxStyle ? { 'wallpaper-paste.syntaxStyle': syntaxStyle } : {}), ...(primaries ? { 'wallpaper-paste.primaryDark': primaries.dark, 'wallpaper-paste.primaryLight': primaries.light } : {}) })) {
+            for (const [key, written] of Object.entries({ 'borrowed-light.harmony': harmony, 'borrowed-light.appearance': appearance, ...(syntaxStyle ? { 'borrowed-light.syntaxStyle': syntaxStyle } : {}), ...(primaries ? { 'borrowed-light.primaryDark': primaries.dark, 'borrowed-light.primaryLight': primaries.light } : {}) })) {
                 const config = vscode.workspace.getConfiguration();
                 const saved = this.state.get<PreviewJournal>(previewKey);
                 if (!saved) { throw new Error('Preview session is no longer active'); }

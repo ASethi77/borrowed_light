@@ -26,7 +26,7 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
     const previousPrimary: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('arrow-left'), tooltip: 'Previous primary color' };
     const nextPrimary: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('symbol-color'), tooltip: 'Next primary color (wallpaper and rule colors)' };
     const syntaxButton: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('symbol-keyword'), tooltip: 'Cycle syntax colors: mellow, balanced, vibrant, vibrant alternate' };
-    picker.title = 'Wallpaper Paste: Loading color schemes…';
+    picker.title = 'Borrowed Light: Loading color schemes…';
     picker.placeholder = '↑/↓ rules · toolbar: primary / syntax / light-dark · Enter keeps · Esc cancels';
     picker.items = items;
     picker.buttons = [previous, next, previousPrimary, nextPrimary, syntaxButton, brightness];
@@ -49,7 +49,7 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
     const title = () => {
         const base = variants?.[harmony][appearance];
         const primary = base && resolvePrimary(base.swatches, base.palette, primaries[appearance]);
-        picker.title = `Wallpaper Paste: ${appearance === 'light' ? 'Light' : 'Dark'} · ${syntaxStyle} · ${primary ? `${primary.label} ${primary.hex}` : 'Loading'}`;
+        picker.title = `Borrowed Light: ${appearance === 'light' ? 'Light' : 'Dark'} · ${syntaxStyle} · ${primary ? `${primary.label} ${primary.hex}` : 'Loading'}`;
     };
     const request = () => {
         if (!variants || finishing || requestedKey === selectionKey()) { return; }

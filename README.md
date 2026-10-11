@@ -1,15 +1,15 @@
-# Wallpaper Paste
+# Borrowed Light
 
 Generate a readable VS Code theme from your Fedora/GNOME desktop wallpaper. The extension themes the workbench, TextMate syntax, semantic tokens, and terminal's default palette. It reads the wallpaper locally and does not upload images.
 
 ## Use
 
 1. Install the VSIX through **Extensions: Install from VSIX…**, or open this directory in VS Code and press **F5**.
-2. Run **Wallpaper Paste: Sync Theme from Wallpaper** from the Command Palette.
-   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The **symbol-color** button cycles the primary color; the adjacent left arrow cycles it backwards. The title shows its source and hex value. Light and dark previews remember separate primary choices. Use the **keyword** (`symbol-keyword`) button to cycle syntax styles: Mellow, Balanced, Vibrant, and Vibrant Alternate. The title shows the active style; Enter saves it and Escape restores the starting highlighting. The picker starts in the currently selected Wallpaper Paste Light/Dark theme, even when the saved appearance preference differs. Changing rules or primary colors keeps that mode until you explicitly toggle it. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
-3. Run **Wallpaper Paste: Show Palette and Contrast Report** to inspect the wallpaper's colors, generated harmony, readability adjustments, and contrast measurements. This command does not apply a theme.
-4. Optionally enable `wallpaper-paste.autoSync` in Settings. Monitoring applies changes while a Wallpaper Paste theme is selected. Choosing another theme pauses application.
-5. Run **Wallpaper Paste: Restore Previous Theme** to turn off auto-sync and restore settings from before the first sync. Later user edits are preserved.
+2. Run **Borrowed Light: Sync Theme from Wallpaper** from the Command Palette.
+   Click **Borrowed Light** in the status bar, or run **Borrowed Light: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The **symbol-color** button cycles the primary color; the adjacent left arrow cycles it backwards. The title shows its source and hex value. Light and dark previews remember separate primary choices. Use the **keyword** (`symbol-keyword`) button to cycle syntax styles: Mellow, Balanced, Vibrant, and Vibrant Alternate. The title shows the active style; Enter saves it and Escape restores the starting highlighting. The picker starts in the currently selected Borrowed Light light/dark theme, even when the saved appearance preference differs. Changing rules or primary colors keeps that mode until you explicitly toggle it. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
+3. Run **Borrowed Light: Show Palette and Contrast Report** to inspect the wallpaper's colors, generated harmony, readability adjustments, and contrast measurements. This command does not apply a theme.
+4. Optionally enable `borrowed-light.autoSync` in Settings. Monitoring applies changes while a Borrowed Light theme is selected. Choosing another theme pauses application.
+5. Run **Borrowed Light: Restore Previous Theme** to turn off auto-sync and restore settings from before the first sync. Later user edits are preserved.
 
 The default is a dark analogous theme. Generated colors are stored in theme-specific blocks in your **user settings**, so unrelated themes and customization blocks remain intact. Explicit sync overwrites generated keys in those blocks. Restoration removes only values still matching the extension's last writes. Disable or uninstall alone leaves the applied settings in place; run Restore first if you want them removed. Generated user settings can travel through VS Code Settings Sync; wallpaper paths and the restoration ledger stay in local extension state and are not added to its synced keys.
 
@@ -18,7 +18,7 @@ The default is a dark analogous theme. Generated colors are stored in theme-spec
 - VS Code 1.128 or later; a local GNOME session with `gsettings` and the GNOME desktop schemas available.
 - Local JPEG or PNG wallpaper, at most 64 MiB and 32 megapixels. Decoding/extraction runs in a separate worker with a 15-second deadline; the JPEG decoder has a 512 MiB allocation budget.
 - Remote SSH, WSL, and Dev Container workspaces use the **local client** extension host and wallpaper. VS Code for the Web is unsupported.
-- Flatpak or another sandbox may prevent access to the desktop settings or wallpaper file. Failures retain the last working theme; see the **Wallpaper Paste** Output channel.
+- Flatpak or another sandbox may prevent access to the desktop settings or wallpaper file. Failures retain the last working theme; see the **Borrowed Light** Output channel.
 - V1 reads the configured wallpaper image, not a screen capture. It does not reproduce monitor cropping, desktop overlays, per-monitor composition, or live wallpaper transitions.
 - WebP, SVG, JXL, GNOME XML slideshows, and Windows/macOS/other Linux desktop discovery are not supported yet. A missing/unreadable image reports an error rather than replacing your current theme.
 - Images are interpreted as sRGB; embedded ICC profiles are not color-managed. Fully transparent pixels are ignored, and partial transparency weights palette samples without reconstructing the desktop background composite.
@@ -27,14 +27,14 @@ The default is a dark analogous theme. Generated colors are stored in theme-spec
 
 | Setting | Default | Options |
 | --- | --- | --- |
-| `wallpaper-paste.harmony` | `analogous` | `analogous`, `monochromatic`, `triad`, `complementary`, `compound`, `shades` |
-| `wallpaper-paste.appearance` | `dark` | `dark`, `light`, `desktop` |
-| `wallpaper-paste.primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
-| `wallpaper-paste.primaryLight` | `automatic` | Same options, remembered independently for light mode |
-| `wallpaper-paste.syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
-| `wallpaper-paste.autoSync` | `false` | Enable wallpaper/appearance monitoring and periodic file checks |
+| `borrowed-light.harmony` | `analogous` | `analogous`, `monochromatic`, `triad`, `complementary`, `compound`, `shades` |
+| `borrowed-light.appearance` | `dark` | `dark`, `light`, `desktop` |
+| `borrowed-light.primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
+| `borrowed-light.primaryLight` | `automatic` | Same options, remembered independently for light mode |
+| `borrowed-light.syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
+| `borrowed-light.autoSync` | `false` | Enable wallpaper/appearance monitoring and periodic file checks |
 
-Settings apply at application scope. With auto-sync off, change settings and run Sync again to apply them. With auto-sync on, changes regenerate the selected Wallpaper Paste theme. Monitoring uses GNOME change notifications plus a check every 30 seconds for file changes, including replacement at the same path. Source changes are debounced for 500 ms; superseded workers are cancelled.
+Settings apply at application scope. With auto-sync off, change settings and run Sync again to apply them. With auto-sync on, changes regenerate the selected Borrowed Light theme. Monitoring uses GNOME change notifications plus a check every 30 seconds for file changes, including replacement at the same path. Source changes are debounced for 500 ms; superseded workers are cancelled.
 
 GNOME's appearance selects the wallpaper URI: `picture-uri-dark` for dark appearance, otherwise `picture-uri`. An empty/missing dark key falls back to the ordinary URI. This selection follows the desktop even when VS Code's generated appearance is explicitly dark or light.
 
@@ -94,7 +94,7 @@ VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 xvfb-run -a env VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 ```
 
-Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.6.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
+Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `borrowed-light-0.0.8.vsix`; both themes and the bundled worker are included. The publisher `borrowed-light-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
 
 ## Extension points
 

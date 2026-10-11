@@ -1,8 +1,8 @@
 {
-  "name": "wallpaper-paste",
-  "displayName": "Wallpaper Paste",
-  "description": "Generate a readable VS Code theme from your GNOME desktop wallpaper",
-  "version": "0.0.7",
+  "name": "borrowed-light",
+  "displayName": "Borrowed Light",
+  "description": "Generate harmonious, readable VS Code themes from your desktop wallpaper",
+  "version": "0.0.8",
   "engines": {
     "vscode": "^1.128.0"
   },
@@ -17,38 +17,40 @@
   "contributes": {
     "commands": [
       {
-        "command": "wallpaper-paste.sync",
-        "title": "Wallpaper Paste: Sync Theme from Wallpaper"
+        "command": "borrowed-light.sync",
+        "title": "Borrowed Light: Sync Theme from Wallpaper"
       },
       {
-        "command": "wallpaper-paste.report",
-        "title": "Wallpaper Paste: Show Palette and Contrast Report"
+        "command": "borrowed-light.report",
+        "title": "Borrowed Light: Show Palette and Contrast Report"
       },
       {
-        "command": "wallpaper-paste.restore",
-        "title": "Wallpaper Paste: Restore Previous Theme"
+        "command": "borrowed-light.restore",
+        "title": "Borrowed Light: Restore Previous Theme"
       },
       {
-        "command": "wallpaper-paste.preview",
-        "title": "Wallpaper Paste: Preview Color Schemes"
+        "command": "borrowed-light.preview",
+        "title": "Borrowed Light: Preview Color Schemes"
       }
     ],
     "themes": [
       {
-        "label": "Wallpaper Paste Dark",
+        "label": "Borrowed Light (Dark)",
         "uiTheme": "vs-dark",
-        "path": "./themes/dark-color-theme.json"
+        "path": "./themes/dark-color-theme.json",
+        "id": "Borrowed Light (Dark)"
       },
       {
-        "label": "Wallpaper Paste Light",
+        "label": "Borrowed Light (Light)",
         "uiTheme": "vs",
-        "path": "./themes/light-color-theme.json"
+        "path": "./themes/light-color-theme.json",
+        "id": "Borrowed Light (Light)"
       }
     ],
     "configuration": {
-      "title": "Wallpaper Paste",
+      "title": "Borrowed Light",
       "properties": {
-        "wallpaper-paste.harmony": {
+        "borrowed-light.harmony": {
           "type": "string",
           "enum": [
             "analogous",
@@ -62,7 +64,7 @@
           "scope": "application",
           "description": "Harmony recipe used to derive the wallpaper palette."
         },
-        "wallpaper-paste.appearance": {
+        "borrowed-light.appearance": {
           "type": "string",
           "enum": [
             "dark",
@@ -73,13 +75,13 @@
           "scope": "application",
           "description": "Generated theme appearance. Desktop follows GNOME light/dark preference."
         },
-        "wallpaper-paste.autoSync": {
+        "borrowed-light.autoSync": {
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "description": "Monitor wallpaper changes while a Wallpaper Paste theme is selected. Sync manually first to select it."
+          "description": "Monitor wallpaper changes while a Borrowed Light theme is selected. Sync manually first to select it."
         },
-        "wallpaper-paste.primaryDark": {
+        "borrowed-light.primaryDark": {
           "type": "string",
           "enum": [
             "automatic",
@@ -101,7 +103,7 @@
           "scope": "application",
           "description": "Primary surface/accent color for dark mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
         },
-        "wallpaper-paste.primaryLight": {
+        "borrowed-light.primaryLight": {
           "type": "string",
           "enum": [
             "automatic",
@@ -123,7 +125,7 @@
           "scope": "application",
           "description": "Primary surface/accent color for light mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
         },
-        "wallpaper-paste.syntaxStyle": {
+        "borrowed-light.syntaxStyle": {
           "type": "string",
           "enum": [
             "mellow",
@@ -145,7 +147,7 @@
     },
     "grammars": [
       {
-        "scopeName": "wallpaper-paste.python-html",
+        "scopeName": "borrowed-light.python-html",
         "path": "./syntaxes/python-html.tmLanguage.json",
         "injectTo": [
           "source.python"
@@ -175,7 +177,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.7.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out borrowed-light-0.0.8.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",
@@ -204,5 +206,5 @@
   "extensionKind": [
     "ui"
   ],
-  "publisher": "wallpaper-paste-local"
+  "publisher": "borrowed-light-local"
 }

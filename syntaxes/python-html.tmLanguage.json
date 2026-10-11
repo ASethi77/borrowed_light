@@ -1,5 +1,5 @@
 {
-  "scopeName": "wallpaper-paste.python-html",
+  "scopeName": "borrowed-light.python-html",
   "injectionSelector": "L:source.python string.quoted.multi.python -meta.fstring.python -meta.embedded.block.html, L:source.python string.quoted.raw.multi.python -meta.fstring.python -meta.embedded.block.html, L:source.python string.regexp.quoted.multi.python -meta.fstring.python -meta.embedded.block.html",
   "patterns": [
     {

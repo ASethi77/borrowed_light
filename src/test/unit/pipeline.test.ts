@@ -16,7 +16,7 @@ const makeImage = () => {
     return image;
 };
 test('JPEG/PNG decode and packaged worker round-trip; paths need no shell escaping', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'wallpaper-paste-'));
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-'));
     const pngPath = join(directory, "wallpaper 'é'.png"), jpegPath = join(directory, 'wallpaper.jpg');
     await writeFile(pngPath, PNG.sync.write(makeImage()));
     await writeFile(jpegPath, jpeg.encode(makeImage(), 90).data);
@@ -50,7 +50,7 @@ test('JPEG/PNG decode and packaged worker round-trip; paths need no shell escapi
     assert.ok(html.includes('Content-Security-Policy'));
 });
 test('malformed, unsupported, oversized PNG and missing files reject without applying anything', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'wallpaper-paste-errors-'));
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-errors-'));
     const path = join(directory, 'wallpaper.png');
     await writeFile(path, '<background><static/></background>');
     await assert.rejects(decodeImage(path), /Unsupported/);
