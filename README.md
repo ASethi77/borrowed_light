@@ -4,6 +4,8 @@
 
 Turn your desktop wallpaper into a readable VS Code theme. Borrowed Light colors the editor, syntax highlighting, workbench, and terminal palette, with live previews to help you find a look you like. Your wallpaper stays on your computer; images are never uploaded.
 
+https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
+
 > **Automatically generate light and dark themes from the same wallpaper.** Preview both appearances, choose a primary hue for each, and keep your preferred theme.
 
 **No external software needs to be installed on supported desktops.** Borrowed Light includes JPEG/PNG decoding and uses built-in OS capabilities for wallpaper discovery and additional native image formats.
