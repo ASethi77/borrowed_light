@@ -1,11 +1,12 @@
 import { desktopInteropScript } from '../../platform/windows/scripts';
-import { wallpaperScript as macosWallpaperScript } from '../../platform/macos/scripts';
+import { wallpaperScript as macosWallpaperScript, imageScript as macosImageScript } from '../../platform/macos/scripts';
 import { osascriptArguments } from '../../platform/macos/wallpaper';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { detectPlatform } from '../../platform/os_detect';
 import { providerRegistry, selectProvider, nativeImageDecoder } from '../../platform/os_wallpaper';
 import { WindowsProvider, primaryWallpaperPath, powershellArguments, powershellExecutable } from '../../platform/windows/wallpaper';
@@ -115,6 +116,42 @@ test('native adapters send bytes via stdin with limits and cancellation', async 
         return Buffer.from('normalized');
     };
     for (const decoder of [windowsImageDecoder(run), macosImageDecoder(run)]) { assert.equal(Buffer.from(await decoder(source, abort.signal)).toString(), 'normalized'); }
+});
+test('macOS bridges opaque ImageIO metadata before validating dimensions and decoding', () => {
+    const propertiesRef = Symbol('CFDictionaryRef');
+    const dictionary = Symbol('NSDictionary');
+    const png = { length: 82, isNil: () => false };
+    const source = Symbol('CGImageSourceRef');
+    let dimensions: Record<string, number | undefined> = { PixelWidth: 16, PixelHeight: 16 };
+    let decoded = false, written = false;
+    const context = {
+        ObjC: {
+            import: () => {},
+            castRefToObject: (reference: unknown) => { assert.equal(reference, propertiesRef); return dictionary; },
+            deepUnwrap: (object: unknown) => { assert.equal(object, dictionary, 'unwrap requires the bridged dictionary'); return dimensions; },
+        },
+        $: {
+            NSFileHandle: {
+                fileHandleWithStandardInput: { readDataToEndOfFile: { length: 441 } },
+                fileHandleWithStandardOutput: { writeData: (bytes: unknown) => { assert.equal(bytes, png); written = true; } },
+            },
+            CGImageSourceCreateWithData: () => source,
+            CGImageSourceCopyPropertiesAtIndex: (imageSource: unknown, index: number) => { assert.equal(imageSource, source); assert.equal(index, 0); return propertiesRef; },
+            CGImageSourceCreateImageAtIndex: () => { decoded = true; return Symbol('CGImageRef'); },
+            NSBitmapImageRep: { alloc: { initWithCGImage: () => ({ representationUsingTypeProperties: () => png }) } },
+            NSBitmapImageFileTypePNG: 4,
+            NSDictionary: { dictionary: {} },
+        },
+    };
+    const run = () => runInNewContext(macosImageScript + '\nrun();', context);
+    run(); assert.ok(decoded && written);
+    for (const invalid of [{ PixelWidth: 10000000, PixelHeight: 16 }, { PixelWidth: 0, PixelHeight: 16 }, { PixelWidth: 1.5, PixelHeight: 16 }, {}]) {
+        dimensions = invalid;
+        decoded = false; written = false;
+        assert.throws(run, /32 megapixel|invalid wallpaper dimensions/);
+        assert.equal(decoded, false, 'reject invalid metadata before allocating the raster');
+        assert.equal(written, false);
+    }
 });
 test('real Windows BMP / macOS HEIC native decoding and malformed input', { skip: !['win32', 'darwin'].includes(process.platform) }, async () => {
     const decoder = nativeImageDecoder()!;

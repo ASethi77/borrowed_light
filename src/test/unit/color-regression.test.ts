@@ -7,13 +7,16 @@ import { harmonies, syntaxStyles } from '../../model';
 import { generateVariant } from '../../variants';
 
 // Captured from the implementation before the readability/type refactor. Fingerprints
-// include full palettes, workbench/token colors, role order and unrounded contrast ratios.
+// include full palettes, workbench/token colors, role order and contrast ratios.
+// Normalize ONLY reported ratios to 10 decimal places: Node/V8 versions differ in the
+// last floating-point bits of sRGB exponentiation. Color strings and every other field
+// remain exact; production calculations and contrast threshold checks are unchanged.
 // Update only for an intentional visual/algorithm change, not a structural refactor.
 const themeBaselines = [
-    { colors: ['#229944', '#2244bb', '#ddcc22', '#cc3344'], fingerprint: 'f31f5757a83ec45ad0a1caa269a5be0d016d49867566799de92aca0bfe968532' },
-    { colors: ['#697663', '#bac0b8', '#3a572e'], fingerprint: '504a6faba21cc0f801adb35f4d8ee97dcf2fc28625eb3ed975df1923acd15215' },
-    { colors: ['#111111', '#777777', '#eeeeee'], fingerprint: '07ecee2505ac8b5fcae6b42311c6a0c817aa7f3e7fb7b491e5a980581a89d36e' },
-    { colors: ['#ef1234', '#34abce', '#ffa200'], fingerprint: '15e52ea2e19c251b35310e09957a0328f1b0ef8b9b66e8704f3644e954f8bc69' },
+    { colors: ['#229944', '#2244bb', '#ddcc22', '#cc3344'], fingerprint: '332fa282d0b6de76c2bf043c48d1ee12152752d104b772f71aa889142e32bafd' },
+    { colors: ['#697663', '#bac0b8', '#3a572e'], fingerprint: '0d260d90deebe16b6dc7dd07ae2285b612911b6b57b0f76ee4ebc9eabbf4b63b' },
+    { colors: ['#111111', '#777777', '#eeeeee'], fingerprint: 'a326d395bf0bdaa950dc3fb150ea76f92e6b996eff6bdb62de55c9d1b1ae311a' },
+    { colors: ['#ef1234', '#34abce', '#ffa200'], fingerprint: '5c96b5807531de96f97d4c697ac9c523911cfbd9a7ce110a0b118d46ab79c72b' },
 ];
 
 test('768 generated variants retain their complete pre-refactor outputs', () => {
@@ -29,7 +32,9 @@ test('768 generated variants retain their complete pre-refactor outputs', () => 
                 }
             }
         }
-        const fingerprint = createHash('sha256').update(JSON.stringify(variants)).digest('hex');
+        const serialized = JSON.stringify(variants, (key, value: unknown) =>
+            key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
+        const fingerprint = createHash('sha256').update(serialized).digest('hex');
         assert.equal(fingerprint, baseline.fingerprint, `Output changed for ${baseline.colors.join(', ')}`);
     }
 });

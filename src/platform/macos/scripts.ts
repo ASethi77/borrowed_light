@@ -28,9 +28,14 @@ function run() {
     if (Number(data.length) > 67108864) { throw new Error('Wallpaper exceeds the 64 MiB input limit'); }
     const source = $.CGImageSourceCreateWithData(data, null);
     if (!source) { throw new Error('macOS cannot decode this wallpaper format'); }
-    const properties = ObjC.deepUnwrap($.CGImageSourceCopyPropertiesAtIndex(source, 0, null));
+    // ImageIO returns an opaque CFDictionaryRef, not an Objective-C dictionary.
+    // Bridge the toll-free Foundation object before unwrapping its numeric metadata.
+    const propertiesRef = $.CGImageSourceCopyPropertiesAtIndex(source, 0, null);
+    if (!propertiesRef) { throw new Error('macOS cannot read wallpaper dimensions'); }
+    const properties = ObjC.deepUnwrap(ObjC.castRefToObject(propertiesRef));
     const width = Number(properties.PixelWidth), height = Number(properties.PixelHeight);
-    if (!width || !height || width * height > 32000000) { throw new Error('Wallpaper exceeds the 32 megapixel limit'); }
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) { throw new Error('macOS returned invalid wallpaper dimensions'); }
+    if (width * height > 32000000) { throw new Error('Wallpaper exceeds the 32 megapixel limit'); }
     const image = $.CGImageSourceCreateImageAtIndex(source, 0, null);
     if (!image) { throw new Error('macOS cannot decode this wallpaper frame'); }
     const representation = $.NSBitmapImageRep.alloc.initWithCGImage(image);
