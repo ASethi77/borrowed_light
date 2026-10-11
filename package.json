@@ -2,7 +2,7 @@
   "name": "wallpaper-paste",
   "displayName": "Wallpaper Paste",
   "description": "Generate a readable VS Code theme from your GNOME desktop wallpaper",
-  "version": "0.0.4",
+  "version": "0.0.7",
   "engines": {
     "vscode": "^1.128.0"
   },
@@ -122,9 +122,44 @@
           "default": "automatic",
           "scope": "application",
           "description": "Primary surface/accent color for light mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
+        },
+        "wallpaper-paste.syntaxStyle": {
+          "type": "string",
+          "enum": [
+            "mellow",
+            "balanced",
+            "vibrant",
+            "vibrant-alt"
+          ],
+          "enumDescriptions": [
+            "Soft harmony colors with neutral identifiers.",
+            "Moderately saturated harmony colors with neutral identifiers.",
+            "Distinct wallpaper and harmony-derived accents for syntax families, including identifiers, parameters and properties.",
+            "The vibrant palette with a different assignment to syntax categories."
+          ],
+          "default": "balanced",
+          "scope": "application",
+          "description": "Syntax highlighting style. Cycle live using the keyword button in the wallpaper preview."
         }
       }
-    }
+    },
+    "grammars": [
+      {
+        "scopeName": "wallpaper-paste.python-html",
+        "path": "./syntaxes/python-html.tmLanguage.json",
+        "injectTo": [
+          "source.python"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.html": "html",
+          "source.js": "javascript",
+          "source.css": "css"
+        },
+        "tokenTypes": {
+          "meta.embedded.block.html": "other"
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -140,7 +175,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.4.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out wallpaper-paste-0.0.7.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

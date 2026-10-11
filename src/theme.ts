@@ -1,8 +1,9 @@
 import { color, contrast, lch, readable } from './colors';
-import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule } from './model';
+import { syntaxColors } from './syntax';
+import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle } from './model';
 
 export const themeNames = { dark: 'Wallpaper Paste Dark', light: 'Wallpaper Paste Light' };
-export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: string = palette[2]): GeneratedTheme {
+export function generateTheme(palette: string[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: string = palette[2], syntaxStyle: SyntaxStyle = 'balanced'): GeneratedTheme {
     if (palette.length !== 5) { throw new Error('Expected five harmony colors'); }
     const seed = lch(primary);
     const dark = appearance === 'dark';
@@ -56,19 +57,25 @@ export function generateTheme(palette: string[], appearance: Appearance, policy:
     put(['inputValidation.errorForeground', 'inputValidation.warningForeground', 'inputValidation.infoForeground'], text);
     put(['editorInfo.foreground', 'inputValidation.infoBorder'], accent);
     const comment = role('Comments', color(dark ? 0.6 : 0.5, tint, seed.h), all, policy.comment);
-    const keywords = role('Keywords', palette[0]);
-    const strings = role('Strings', palette[1]);
-    const numbers = role('Numbers and constants', palette[2]);
-    const functions = role('Functions', palette[3]);
-    const types = role('Types', palette[4]);
+    const syntax = syntaxColors(swatches, palette, appearance, syntaxStyle);
+    const vibrant = syntaxStyle === 'vibrant' || syntaxStyle === 'vibrant-alt';
+    const identifiers = vibrant ? role('Variables and properties', syntax[5]) : text;
+    const keywords = role('Keywords', syntax[0]);
+    const strings = role('Strings', syntax[1]);
+    const numbers = role('Numbers and constants', syntax[2]);
+    const functions = role('Functions', syntax[3]);
+    const types = role('Types', syntax[4]);
     const textMateRules: TextMateRule[] = [
         { scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: comment } },
         { scope: ['keyword', 'storage'], settings: { foreground: keywords } },
-        { scope: ['string', 'markup.inline.raw', 'markup.fenced_code'], settings: { foreground: strings } },
-        { scope: ['constant', 'constant.numeric'], settings: { foreground: numbers } },
-        { scope: ['entity.name.function', 'support.function'], settings: { foreground: functions } },
-        { scope: ['entity.name.type', 'entity.name.class', 'support.type', 'support.class'], settings: { foreground: types } },
-        { scope: ['variable', 'punctuation', 'meta.embedded'], settings: { foreground: text } },
+        { scope: ['string', 'markup.inline.raw', 'markup.fenced_code', 'storage.type.string.python'], settings: { foreground: strings } },
+        { scope: ['constant', 'constant.numeric', 'support.constant', 'storage.type.number.python', 'storage.type.imaginary.number.python'], settings: { foreground: numbers } },
+        { scope: ['entity.name.function', 'support.function', 'meta.function-call.generic.python'], settings: { foreground: functions } },
+        { scope: ['entity.name.type', 'entity.name.class', 'support.type', 'support.class', 'entity.other.inherited-class'], settings: { foreground: types } },
+        { scope: ['variable', 'entity.name.variable', 'support.variable'], settings: { foreground: identifiers } },
+        { scope: ['variable.parameter'], settings: { foreground: vibrant ? strings : text } },
+        { scope: ['variable.other.property', 'support.variable.property'], settings: { foreground: vibrant ? types : text } },
+        { scope: ['punctuation', 'meta.embedded'], settings: { foreground: text } },
         { scope: ['markup.heading', 'entity.name.tag'], settings: { foreground: keywords } },
         { scope: ['entity.other.attribute-name', 'markup.link'], settings: { foreground: functions } },
         { scope: ['invalid'], settings: { foreground: error } },
@@ -76,7 +83,7 @@ export function generateTheme(palette: string[], appearance: Appearance, policy:
     const semanticRules: Record<string, string> = {
         '*': text, comment, string: strings, number: numbers, keyword: keywords, operator: text,
         function: functions, method: functions, type: types, class: types, interface: types, enum: types,
-        typeParameter: types, namespace: types, struct: types, variable: text, parameter: text, property: text,
+        typeParameter: types, namespace: types, struct: types, variable: identifiers, parameter: vibrant ? strings : text, property: vibrant ? types : text,
         enumMember: numbers, 'variable.readonly': numbers, decorator: functions, regexp: strings,
     };
     // ANSI status hues retain their meaning; all ANSI foregrounds remain readable on the base terminal.

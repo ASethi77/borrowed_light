@@ -1,0 +1,17 @@
+{
+  "scopeName": "wallpaper-paste.python-html",
+  "injectionSelector": "L:source.python string.quoted.multi.python -meta.fstring.python -meta.embedded.block.html, L:source.python string.quoted.raw.multi.python -meta.fstring.python -meta.embedded.block.html, L:source.python string.regexp.quoted.multi.python -meta.fstring.python -meta.embedded.block.html",
+  "patterns": [
+    {
+      "name": "meta.embedded.block.html",
+      "begin": "(?i)(?=<!doctype[ \\t]+html\\b|<html\\b)",
+      "end": "(?i)(?<=</html>)|(?=\"\"\"|\\x27\\x27\\x27)",
+      "patterns": [
+        {
+          "include": "text.html.basic"
+        }
+      ]
+    }
+  ],
+  "comment": "Embed HTML documents in Python multiline strings; leave quote delimiters and formatted-string interpolation to the Python grammar. MagicPython scopes lowercase raw strings as regexp."
+}

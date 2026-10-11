@@ -9,6 +9,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { runVariant } from '../pipeline';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 
 class Memory implements vscode.Memento {
     private values: Record<string, unknown> = {};
@@ -25,7 +27,7 @@ class Memory implements vscode.Memento {
 const palette = ['#5a8cab','#d79e63','#8eb886','#bd88c7','#bf7272'];
 suite('Wallpaper Paste extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
-    const sections = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.autoSync', 'wallpaper-paste.harmony', 'wallpaper-paste.appearance', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
+    const sections = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.autoSync', 'wallpaper-paste.harmony', 'wallpaper-paste.appearance', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight', 'wallpaper-paste.syntaxStyle'];
     let originals: Record<string, unknown>;
     setup(() => {
         originals = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
@@ -173,7 +175,7 @@ suite('Wallpaper Paste extension host', () => {
             await waitFor('triad');
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
-            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' } });
+            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced' });
             assert.equal(config().get('wallpaper-paste.harmony'), 'triad');
             assert.equal(config().get('wallpaper-paste.appearance'), 'dark');
             assert.deepEqual(errors, []);
@@ -188,7 +190,7 @@ suite('Wallpaper Paste extension host', () => {
         const picker = createPreviewPicker({
             application: app, prepare: async () => ({ variants, harmony: 'analogous', appearance: 'dark' }),
             enqueue: action => { const next = writes.then(action); writes = next.catch(() => {}); return next; },
-            generate: (swatches, rule, mode, primary, signal) => runVariant(join(__dirname, '../../dist/palette-worker.js'), swatches, rule, mode, primary, signal),
+            generate: (swatches, rule, mode, primary, signal, style) => runVariant(join(__dirname, '../../dist/palette-worker.js'), swatches, rule, mode, primary, signal, style),
             error: error => { errors.push(error); },
         });
         const waitFor = async (mode: 'light' | 'dark', primary: 'automatic' | 'wallpaper-1' | 'wallpaper-2') => {
@@ -218,5 +220,141 @@ suite('Wallpaper Paste extension host', () => {
             assert.equal(config().get('wallpaper-paste.primaryLight'), 'wallpaper-1');
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); }
+    });
+    test('syntax styles preview live, preserve light/primary colors, save on Enter, and revert on Escape', async () => {
+        const app = new ThemeApplication(new Memory());
+        const swatches = [{ hex: '#229944', weight: 0.7 }, { hex: '#2266cc', weight: 0.15 }, { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 }];
+        const primaries = { light: 'wallpaper-2', dark: 'wallpaper-1' } as const;
+        const directory = await mkdtemp(join(tmpdir(), 'wallpaper-syntax-'));
+        const path = join(directory, 'preview.ts');
+        await writeFile(path, '// Wallpaper colors highlight identifiers and syntax\ninterface Color { hex: string; weight: number }\nconst colors: Color[] = [{ hex: "#229944", weight: 0.7 }];\nfunction describe(color: Color): string {\n    return `${color.hex}: ${color.weight * 100}%`;\n}\ncolors.map(color => describe(color));\n');
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(vscode.Uri.file(path)));
+        let writes = Promise.resolve();
+        const errors: unknown[] = [];
+        let previewReady = false;
+        const start = (style: 'balanced' | 'vibrant') => {
+            previewReady = false;
+            return createPreviewPicker({
+                application: app, prepare: async () => ({ variants: generateVariants(swatches, primaries, style), harmony: 'analogous', appearance: 'light', primaries, syntaxStyle: style }),
+                enqueue: action => { const next = writes.then(async () => { await action(); previewReady = true; }); writes = next.catch(() => {}); return next; },
+                generate: (swatches, rule, mode, primary, signal, style) => runVariant(join(__dirname, '../../dist/palette-worker.js'), swatches, rule, mode, primary, signal, style),
+                error: error => { errors.push(error); },
+            });
+        };
+        const waitFor = async (style: 'mellow' | 'balanced' | 'vibrant' | 'vibrant-alt') => {
+            const expected = generateVariant(swatches, 'analogous', 'light', primaries.light, style).theme;
+            // Reopening a picker can already match the previous theme before preparation finishes.
+            const matches = () => previewReady && app.active === themeNames.light && JSON.stringify((config().inspect<Values>('editor.semanticTokenColorCustomizations')?.globalValue?.['[Wallpaper Paste Light]'] as Values | undefined)?.rules) === JSON.stringify(expected.semanticRules);
+            const deadline = Date.now() + 10000;
+            while (!matches() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
+            assert.ok(matches(), style);
+            assert.deepEqual(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Wallpaper Paste Light]'], expected.colors);
+            if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/syntax-${style}.png`]);
+            }
+        };
+        let picker = start('balanced');
+        try {
+            await waitFor('balanced');
+            picker.cycleSyntax(-1); await waitFor('mellow');
+            picker.cycleSyntax(); picker.cycleSyntax(); await waitFor('vibrant');
+            await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
+            assert.equal((await picker.closed)?.syntaxStyle, 'vibrant');
+            assert.equal(config().get('wallpaper-paste.syntaxStyle'), 'vibrant');
+            const baseline = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
+            picker = start('vibrant'); await waitFor('vibrant');
+            picker.cycleSyntax(); await waitFor('vibrant-alt');
+            await picker.cancel();
+            for (const section of sections) { assert.deepEqual(config().inspect(section)?.globalValue, baseline[section], section); }
+            assert.deepEqual(errors, []);
+        } finally { await picker.cancel(); await app.restore(); await vscode.commands.executeCommand('workbench.action.closeAllEditors'); }
+    });
+    test('Python HTML documents expose HTML, JS and CSS scopes while ordinary strings remain Python', async () => {
+        const app = new ThemeApplication(new Memory());
+        const fixture = join(await mkdtemp(join(tmpdir(), 'wallpaper-html-')), 'viewer.py');
+        await writeFile(fixture, [
+            '# HTML document embedded in a Python string',
+            'page = """', '<!DOCTYPE html>', '<html>', '<head>',
+            '<style>body { color: red; margin: 20px; }</style>', '</head>', '<body>',
+            '<h1 class="title">Session viewer</h1>', '<script>',
+            'function totalPunches(count) { return count + 20; }',
+            'const title = "frequency sweep";',
+            'let sessionIndex = 0;',
+            'if (totalPunches(sessionIndex) === 20) {',
+            '    document.addEventListener("keydown", event => {',
+            '        sessionIndex += Number(event.target.value);',
+            '    });', '}',
+            '// The opposite triple quote belongs to JavaScript here',
+            'const quotes = "\'\'\'";',
+            '</script>', '</body>', '</html>', '"""',
+            'def after_document():', '    return 42',
+            'plain = """not HTML: function untouched() { return 9; }"""',
+            'raw = r\'\'\'<html><script>const rawValue = 7;</script></html>\'\'\'',
+            'formatted = f"""<html>{title}</html>"""',
+            '# """<html>not a template</html>"""',
+            'unfinished = """<html>', '<body>Incomplete document', '"""',
+            'def after_unfinished():', '    return 99',
+        ].join('\n'));
+        const uri = vscode.Uri.file(fixture);
+        const tokens = await vscode.commands.executeCommand<{ c: string; t: string }[]>('_workbench.captureSyntaxTokens', uri);
+        const has = (content: string, scope: string) => tokens?.some(token => token.c === content && token.t.includes(scope));
+        assert.ok(has('html', 'entity.name.tag'), JSON.stringify(tokens));
+        assert.ok(has('function', 'storage.type.function.js'), JSON.stringify(tokens));
+        assert.ok(has('totalPunches', 'entity.name.function'));
+        assert.ok(has('20', 'constant.numeric'));
+        assert.ok(has('color', 'support.type.property-name.css'));
+        assert.ok(has('rawValue', 'source.js'), JSON.stringify(tokens?.filter(token => token.c.includes('raw') || token.c.includes('Value')).map(({ c, t }) => ({ c, t }))));
+        assert.ok(has('after_document', 'entity.name.function.python'), 'matching delimiter returns to Python');
+        assert.ok(has('after_unfinished', 'entity.name.function.python'), 'unfinished HTML does not swallow subsequent Python');
+        assert.ok(tokens?.some(token => token.c.includes('untouched') && token.t.includes('string.quoted.multi.python') && !token.t.includes('source.js')));
+        assert.ok(tokens?.some(token => token.c.includes('<html>') && token.t.includes('meta.fstring.python') && !token.t.includes('meta.embedded.block.html')), 'formatted strings keep interpolation');
+        assert.ok(tokens?.some(token => token.c.includes('not a template') && token.t.includes('comment.line') && !token.t.includes('meta.embedded.block.html')));
+        try {
+            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+            const swatches = [{ hex: '#697663', weight: 1 }];
+            for (const mode of ['light', 'dark'] as const) {
+                await app.apply(generateVariant(swatches, 'complementary', mode, 'harmony-1', 'vibrant').theme);
+                if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/embedded-${mode}.png`]);
+                }
+            }
+        } finally { await app.restore(); await vscode.commands.executeCommand('workbench.action.closeAllEditors'); }
+    });
+    test('green-wallpaper vibrant highlighting distinguishes real Python scopes without semantic tokens', async () => {
+        const app = new ThemeApplication(new Memory());
+        const swatches = ['#34402f', '#100d0a', '#4a5033', '#2a2e22', '#505d3f', '#8f931e', '#3d5039', '#91975c'].map(hex => ({ hex, weight: 1 / 8 }));
+        const fixture = join(await mkdtemp(join(tmpdir(), 'wallpaper-python-')), 'sweep.py');
+        await writeFile(fixture, '# Green wallpaper, diverse syntax families\n'.repeat(10) + 'from math import sin\n\nclass Signal:\n    def sweep(self, frequency: float, count: int = 20) -> str:\n        label = "frequency sweep"\n        phase = 2.0 * frequency\n        return str(sin(phase))\n\nresponse = Signal().sweep(100.0)\nprint(response)\n');
+        const uri = vscode.Uri.file(fixture);
+        const tokens = await vscode.commands.executeCommand<{ c: string; t: string }[]>('_workbench.captureSyntaxTokens', uri);
+        assert.ok(tokens?.some(token => token.c === 'def' && token.t.includes('storage.type.function.python')));
+        assert.ok(tokens?.some(token => token.c === 'sweep' && token.t.includes('entity.name.function.python')));
+        assert.ok(tokens?.some(token => token.c === 'sin' && token.t.includes('meta.function-call.generic.python')));
+        assert.ok(tokens?.some(token => token.c === 'print' && token.t.includes('support.function.builtin.python')));
+        assert.ok(tokens?.some(token => token.c === 'float' && token.t.includes('support.type.python')));
+        assert.ok(tokens?.some(token => token.c.includes('20') && token.t.includes('constant.numeric')));
+        const controls = ['editor.semanticHighlighting.enabled', 'editor.bracketPairColorization.enabled'];
+        const originals = Object.fromEntries(controls.map(key => [key, config().inspect(key)?.globalValue]));
+        try {
+            for (const key of controls) { await config().update(key, false, vscode.ConfigurationTarget.Global); }
+            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+            for (const mode of ['light', 'dark'] as const) {
+                const result = generateVariant(swatches, 'complementary', mode, 'harmony-5', 'vibrant-alt');
+                await app.apply(result.theme);
+                const rules = (config().inspect<Values>('editor.tokenColorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`] as { textMateRules: typeof result.theme.textMateRules }).textMateRules;
+                const colors = ['storage', 'entity.name.function', 'support.type', 'string', 'constant.numeric'].map(scope => rules.find(rule => rule.scope.includes(scope))!.settings.foreground);
+                assert.equal(new Set(colors).size, 5);
+                if (process.env.WALLPAPER_PASTE_SCREENSHOT_DIR) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await promisify(execFile)('import', ['-window', 'root', `${process.env.WALLPAPER_PASTE_SCREENSHOT_DIR}/python-${mode}.png`]);
+                }
+            }
+        } finally {
+            await app.restore();
+            for (const key of controls) { await config().update(key, originals[key], vscode.ConfigurationTarget.Global); }
+            await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        }
     });
 });

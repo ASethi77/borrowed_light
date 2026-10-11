@@ -1,6 +1,8 @@
 export const harmonies = ['analogous', 'monochromatic', 'triad', 'complementary', 'compound', 'shades'] as const;
 export type Harmony = typeof harmonies[number];
 export type Appearance = 'dark' | 'light';
+export const syntaxStyles = ['mellow', 'balanced', 'vibrant', 'vibrant-alt'] as const;
+export type SyntaxStyle = typeof syntaxStyles[number];
 export type PrimaryChoice = 'automatic' | `wallpaper-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}` | `harmony-${1 | 2 | 3 | 4 | 5}`;
 export type PrimaryChoices = Record<Appearance, PrimaryChoice>;
 export interface PrimaryColor { id: PrimaryChoice; hex: string; label: string }
@@ -36,7 +38,7 @@ export interface GeneratedTheme {
     roles: Role[];
     checks: ContrastCheck[];
 }
-export interface PaletteResult { swatches: Swatch[]; palette: string[]; neutral: boolean; primary: PrimaryColor; theme: GeneratedTheme }
+export interface PaletteResult { swatches: Swatch[]; palette: string[]; neutral: boolean; primary: PrimaryColor; syntaxStyle: SyntaxStyle; theme: GeneratedTheme }
 export type PreviewVariants = Record<Harmony, Record<Appearance, PaletteResult>>;
 export interface PipelineInput {
     path?: string;
@@ -46,4 +48,5 @@ export interface PipelineInput {
     previews?: boolean;
     primary?: PrimaryChoice;
     primaries?: PrimaryChoices;
+    syntaxStyle?: SyntaxStyle;
 }

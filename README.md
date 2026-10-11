@@ -6,7 +6,7 @@ Generate a readable VS Code theme from your Fedora/GNOME desktop wallpaper. The 
 
 1. Install the VSIX through **Extensions: Install from VSIX…**, or open this directory in VS Code and press **F5**.
 2. Run **Wallpaper Paste: Sync Theme from Wallpaper** from the Command Palette.
-   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The **symbol-color** button cycles the primary color; the adjacent left arrow cycles it backwards. The title shows its source and hex value. Light and dark previews remember separate primary choices. The picker starts in the currently selected Wallpaper Paste Light/Dark theme, even when the saved appearance preference differs. Changing rules or primary colors keeps that mode until you explicitly toggle it. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
+   Click **Wallpaper** in the status bar, or run **Wallpaper Paste: Preview Color Schemes**, to explore alternatives. Use ↑/↓ to preview any of the six rules, the toolbar arrows to cycle, and the color-mode button to toggle light/dark. The **symbol-color** button cycles the primary color; the adjacent left arrow cycles it backwards. The title shows its source and hex value. Light and dark previews remember separate primary choices. Use the **keyword** (`symbol-keyword`) button to cycle syntax styles: Mellow, Balanced, Vibrant, and Vibrant Alternate. The title shows the active style; Enter saves it and Escape restores the starting highlighting. The picker starts in the currently selected Wallpaper Paste Light/Dark theme, even when the saved appearance preference differs. Changing rules or primary colors keeps that mode until you explicitly toggle it. The editor, syntax, and workbench update while the picker stays open. **Enter** keeps the selection and saves its rule/appearance; **Escape** or clicking outside restores the starting theme. Keeping an explicit light/dark preview replaces the `desktop` appearance setting.
 3. Run **Wallpaper Paste: Show Palette and Contrast Report** to inspect the wallpaper's colors, generated harmony, readability adjustments, and contrast measurements. This command does not apply a theme.
 4. Optionally enable `wallpaper-paste.autoSync` in Settings. Monitoring applies changes while a Wallpaper Paste theme is selected. Choosing another theme pauses application.
 5. Run **Wallpaper Paste: Restore Previous Theme** to turn off auto-sync and restore settings from before the first sync. Later user edits are preserved.
@@ -31,6 +31,7 @@ The default is a dark analogous theme. Generated colors are stored in theme-spec
 | `wallpaper-paste.appearance` | `dark` | `dark`, `light`, `desktop` |
 | `wallpaper-paste.primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
 | `wallpaper-paste.primaryLight` | `automatic` | Same options, remembered independently for light mode |
+| `wallpaper-paste.syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
 | `wallpaper-paste.autoSync` | `false` | Enable wallpaper/appearance monitoring and periodic file checks |
 
 Settings apply at application scope. With auto-sync off, change settings and run Sync again to apply them. With auto-sync on, changes regenerate the selected Wallpaper Paste theme. Monitoring uses GNOME change notifications plus a check every 30 seconds for file changes, including replacement at the same path. Source changes are debounced for 500 ms; superseded workers are cancelled.
@@ -54,7 +55,18 @@ Recipes use OKLCH hue angles and lightness/chroma. Out-of-gamut colors reduce ch
 
 Light themes use the wallpaper's weighted brightness and colorfulness to set surface lightness and tint, so colorful wallpapers produce visible differences in the editor, sidebar, and fields. Grayscale wallpapers remain neutral. The preview prepares all twelve rule/appearance combinations in a worker after one extraction; cycling reuses these results without decoding the image again. Automatic syncing waits while the picker is open. Interrupted previews are restored when the extension next activates.
 
-Primary colors include both extracted wallpaper swatches (ordered by their image coverage) and colors derived by the selected harmony. This allows smaller blue, yellow, or red highlights to drive the surfaces and accents even when the dominant background is green. Syntax still uses the selected harmony, with contrast adjustments recalculated for the chosen surfaces. Preferences store source slots rather than fixed hex values: they adapt to new wallpapers and rules, and a missing wallpaper slot falls back to automatic. New primary previews are generated in the worker from the existing swatches and cached for the session. Enter saves both modes' choices; Escape discards them.
+Primary colors include both extracted wallpaper swatches (ordered by their image coverage) and colors derived by the selected harmony. This allows smaller blue, yellow, or red highlights to drive the surfaces and accents even when the dominant background is green. Mellow and Balanced syntax use the selected harmony; Vibrant syntax uses observed wallpaper hues supplemented by harmony-derived accents. Contrast adjustments are recalculated for the chosen surfaces. Preferences store source slots rather than fixed hex values: they adapt to new wallpapers and rules, and a missing wallpaper slot falls back to automatic. New primary previews are generated in the worker from the existing swatches and cached for the session. Enter saves both modes' choices; Escape discards them.
+
+## Syntax highlighting
+
+- **Mellow:** softly tinted harmony colors; identifiers stay close to the primary text color.
+- **Balanced:** moderately saturated harmony colors with neutral identifiers (the default).
+- **Vibrant:** separates observed wallpaper and harmony hues, fills missing families with accents derived by splitting hue-wheel gaps, increases colorfulness, and colors variables, parameters, and properties as well as keywords, strings, numbers, functions, and types.
+- **Vibrant Alternate:** reassigns the same separated hues to different syntax families.
+
+Syntax styles affect TextMate and semantic tokens without changing the workbench, primary hue, or light/dark appearance. The style is shared between light and dark mode and remembered across restarts. Comments and punctuation remain restrained. Grayscale images remain neutral. A colorful wallpaper with only one distinct hue still gets a multicolor vibrant syntax palette: missing accents are derived from the wallpaper hue rather than claimed to be extracted colors. Observed colors and the selected harmony take priority when they are sufficiently separated. Python function calls and string/number-specific storage scopes receive explicit assignments. New syntax variants reuse the extracted swatches and are cached while the picker is open.
+
+HTML documents inside ordinary or raw Python triple-quoted strings also receive HTML, JavaScript, and CSS highlighting. An `<!DOCTYPE html` or `<html` root identifies the embedded document. Ordinary strings and docstrings keep Python highlighting. Formatted strings (`f"""..."""`) retain Python's interpolation grammar; arbitrary embedded snippets and other languages are not inferred. This grammar contribution applies across themes while the extension is enabled.
 
 ## Readability and the report
 
@@ -82,7 +94,7 @@ VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 xvfb-run -a env VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 ```
 
-Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.4.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
+Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `wallpaper-paste-0.0.6.vsix`; both themes and the bundled worker are included. The publisher `wallpaper-paste-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
 
 ## Extension points
 

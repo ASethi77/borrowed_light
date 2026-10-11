@@ -30,6 +30,10 @@ test('JPEG/PNG decode and packaged worker round-trip; paths need no shell escapi
     assert.deepEqual(previews, reused);
     const chosen = await runVariant(resolve('dist/palette-worker.js'), result.swatches, 'analogous', 'light', 'wallpaper-2');
     assert.equal(chosen.primary.hex, result.swatches[1].hex);
+    const vibrant = await runVariant(resolve('dist/palette-worker.js'), result.swatches, 'analogous', 'light', 'wallpaper-2', undefined, 'vibrant');
+    assert.equal(vibrant.syntaxStyle, 'vibrant');
+    assert.deepEqual(vibrant.theme.colors, chosen.theme.colors);
+    assert.notDeepEqual(vibrant.theme.semanticRules, chosen.theme.semanticRules);
     const separate = await runPreviews(resolve('dist/palette-worker.js'), { swatches: result.swatches }, undefined, { dark: 'wallpaper-1', light: 'wallpaper-2' });
     assert.equal(separate.analogous.dark.primary.hex, result.swatches[0].hex);
     assert.equal(separate.analogous.light.primary.hex, result.swatches[1].hex);

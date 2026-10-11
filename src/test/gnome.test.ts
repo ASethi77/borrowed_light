@@ -13,7 +13,7 @@ suite('GNOME wallpaper smoke test', () => {
     test('rule cycling follows the active Wallpaper Paste appearance despite the opposite saved setting', async function () {
         if (process.env.WALLPAPER_PASTE_GNOME_SMOKE !== '1') { this.skip(); }
         const config = () => vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight', 'wallpaper-paste.syntaxStyle'];
         const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
         let preview: Thenable<unknown> | undefined;
         const wait = async (predicate: () => boolean) => {
@@ -55,7 +55,7 @@ suite('GNOME wallpaper smoke test', () => {
     test('real wallpaper sync, language editors, light/dark controls, and palette report', async function () {
         if (process.env.WALLPAPER_PASTE_GNOME_SMOKE !== '1') { this.skip(); }
         const config = vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'wallpaper-paste.appearance', 'wallpaper-paste.harmony', 'wallpaper-paste.autoSync', 'wallpaper-paste.primaryDark', 'wallpaper-paste.primaryLight', 'wallpaper-paste.syntaxStyle'];
         const originals = Object.fromEntries(keys.map(key => [key, config.inspect(key)?.globalValue]));
         const fixtures = await mkdtemp(join(tmpdir(), 'wallpaper-paste-editors-'));
         try {

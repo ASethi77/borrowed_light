@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.0.7
+
+- Recognize HTML documents in ordinary and raw Python triple-quoted strings, including embedded JavaScript and CSS.
+- Preserve ordinary Python string highlighting and resume Python highlighting at the matching quote delimiter.
+
+## 0.0.6
+
+- Prevent green-only wallpapers from collapsing all vibrant syntax families into one hue.
+- Supplement observed and harmony colors with separated derived accents, preserving neutral wallpapers.
+- Increase vibrant chroma and distinguish Python call names and string/number storage scopes.
+- Verify actual Python grammar scopes and the screenshot's green-only palette in light/dark modes.
+
+## 0.0.5
+
+- Cycle Mellow, Balanced, Vibrant, and Vibrant Alternate syntax styles in live previews.
+- Use separated wallpaper highlights for vibrant syntax, including variables, parameters, and properties.
+- Persist syntax style on Enter and restore it on Escape, with contrast checks for both token systems.
+- Include the syntax style in the palette/contrast report.
+
 ## 0.0.4
 
 - Start previews from the active Wallpaper Paste Light/Dark theme, preserving its appearance while cycling rules even when the saved preference differs.

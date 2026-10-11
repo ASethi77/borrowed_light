@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contrast, extract, harmonize, lch, matrix, readable } from '../../colors';
-import { Appearance, harmonies } from '../../model';
+import { Appearance, harmonies, syntaxStyles } from '../../model';
 import { generateTheme } from '../../theme';
 import { generateVariant } from '../../variants';
 import { isPrimaryChoice, primaryColors, resolvePrimary } from '../../primary';
+import { syntaxSources } from '../../syntax';
 
 const swatches = [{ hex: '#248abb', weight: 0.7 }, { hex: '#dc7b4d', weight: 0.3 }];
 test('WCAG reference ratios, symmetry, and diagonal', () => {
@@ -114,4 +115,66 @@ test('primary colors include small wallpaper highlights and rule colors without 
     assert.ok(isPrimaryChoice('harmony-5'));
     assert.ok(!isPrimaryChoice('wallpaper-9'));
     assert.ok(!isPrimaryChoice('#2266cc'));
+});
+test('vibrant syntax uses separated wallpaper highlights and colors identifiers while mellow stays subdued', () => {
+    const wallpaper = [
+        { hex: '#229944', weight: 0.5 }, { hex: '#33aa55', weight: 0.15 }, { hex: '#44bb66', weight: 0.1 },
+        { hex: '#2266cc', weight: 0.1 }, { hex: '#eedd22', weight: 0.1 }, { hex: '#cc3322', weight: 0.05 },
+    ];
+    assert.deepEqual(new Set(syntaxSources(wallpaper, [])), new Set(['#229944', '#2266cc', '#eedd22', '#cc3322']));
+    for (const appearance of ['light', 'dark'] as Appearance[]) {
+        const mellow = generateVariant(wallpaper, 'monochromatic', appearance, 'wallpaper-2', 'mellow').theme;
+        const vibrant = generateVariant(wallpaper, 'monochromatic', appearance, 'wallpaper-2', 'vibrant').theme;
+        assert.deepEqual(vibrant.colors, mellow.colors, 'syntax changes leave the workbench intact');
+        assert.equal(mellow.semanticRules.variable, mellow.colors['editor.foreground']);
+        for (const category of ['keyword', 'string', 'number', 'function', 'type', 'variable', 'parameter', 'property']) {
+            assert.ok(lch(vibrant.semanticRules[category]).c > lch(mellow.semanticRules[category]).c);
+        }
+        assert.ok(new Set(['keyword', 'string', 'number', 'function'].map(key => Math.round(lch(vibrant.semanticRules[key]).h / 15))).size >= 4);
+        const alternate = generateVariant(wallpaper, 'monochromatic', appearance, 'wallpaper-2', 'vibrant-alt').theme;
+        assert.notDeepEqual(alternate.semanticRules, vibrant.semanticRules);
+        for (const harmony of harmonies) {
+            for (const style of syntaxStyles) {
+                const theme = generateVariant(wallpaper, harmony, appearance, 'wallpaper-2', style).theme;
+                theme.checks.forEach(check => assert.ok(check.ratio >= check.minimum, `${appearance}/${harmony}/${style}/${check.role}`));
+                for (const foreground of [...Object.values(theme.semanticRules), ...theme.textMateRules.map(rule => rule.settings.foreground)]) {
+                    for (const background of ['editor.background', 'editor.selectionBackground', 'editor.findMatchBackground']) {
+                        assert.ok(contrast(foreground, theme.colors[background]) >= 4.5);
+                    }
+                }
+            }
+        }
+    }
+});
+test('vibrant syntax does not invent colorful hues for a grayscale wallpaper', () => {
+    for (const appearance of ['light', 'dark'] as Appearance[]) {
+        for (const style of syntaxStyles) {
+            const theme = generateVariant([{ hex: '#999999', weight: 1 }], 'analogous', appearance, 'automatic', style).theme;
+            Object.values(theme.semanticRules).forEach(hex => assert.ok(lch(hex).c < 0.001));
+        }
+    }
+});
+test('a green-only wallpaper still gives six distinguishable vibrant token families after contrast adjustment', () => {
+    // Regression for the screenshot: eight similar swatches previously became one syntax hue.
+    const wallpaper = ['#34402f', '#100d0a', '#4a5033', '#2a2e22', '#505d3f', '#8f931e', '#3d5039', '#91975c'].map(hex => ({ hex, weight: 1 / 8 }));
+    const families = ['keyword', 'string', 'number', 'function', 'type', 'variable'];
+    for (const appearance of ['light', 'dark'] as Appearance[]) {
+        for (const style of ['vibrant', 'vibrant-alt'] as const) {
+            const result = generateVariant(wallpaper, 'complementary', appearance, 'harmony-5', style);
+            const colors = families.map(family => lch(result.theme.semanticRules[family]));
+            for (let i = 0; i < colors.length; i++) {
+                for (let j = i + 1; j < colors.length; j++) {
+                    const a = colors[i], b = colors[j];
+                    const distance = Math.hypot(a.l - b.l, a.c * Math.cos(a.h * Math.PI / 180) - b.c * Math.cos(b.h * Math.PI / 180), a.c * Math.sin(a.h * Math.PI / 180) - b.c * Math.sin(b.h * Math.PI / 180));
+                    assert.ok(distance >= 0.075, `${appearance}/${style}: ${families[i]} and ${families[j]} collapsed (${distance})`);
+                }
+            }
+            result.theme.checks.forEach(check => assert.ok(check.ratio >= check.minimum));
+            const scopeColor = (scope: string) => result.theme.textMateRules.find(rule => rule.scope.includes(scope))?.settings.foreground;
+            assert.equal(scopeColor('meta.function-call.generic.python'), result.theme.semanticRules.function);
+            assert.equal(scopeColor('storage.type.string.python'), result.theme.semanticRules.string);
+            assert.equal(scopeColor('storage.type.number.python'), result.theme.semanticRules.number);
+            assert.notEqual(scopeColor('storage'), scopeColor('entity.name.function'));
+        }
+    }
 });
