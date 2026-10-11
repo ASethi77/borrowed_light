@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-package:
+    name: Test and package extension
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check, lint, build, and run unit tests
+        run: npm run test:unit
+
+      - name: Install headless VS Code dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y xvfb libgtk-3-0t64 libnss3 libasound2t64 libgbm1
+
+      - name: Run VS Code extension host tests
+        run: xvfb-run -a -s '-screen 0 1440x1000x24' npm run test:host
+        env:
+          WAYLAND_DISPLAY: ''
+          XDG_SESSION_TYPE: x11
+
+      - name: Package VSIX
+        run: npm run vsix
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: borrowed-light-vsix
+          path: borrowed-light-*.vsix
+          if-no-files-found: error
+          retention-days: 14

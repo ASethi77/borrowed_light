@@ -96,6 +96,8 @@ xvfb-run -a env VSCODE_EXECUTABLE_PATH=/path/to/code npm run test:host
 
 Run the unit suite before host tests to compile test files. `npm test` runs both. `npm run vsix` produces `borrowed-light-0.0.8.vsix`; both themes and the bundled worker are included. The publisher `borrowed-light-local` is a local packaging placeholder and must be replaced with your registered publisher before Marketplace publication. This project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in `THIRD_PARTY_NOTICES.md`.
 
+GitHub Actions runs `.github/workflows/ci.yml` on pushes to `main`, pull requests, and manual dispatch. It installs dependencies with `npm ci` on Node.js 24, checks types and lint, runs unit and headless VS Code host tests, and packages a VSIX. Successful runs provide a `borrowed-light-vsix` artifact for 14 days. The GNOME desktop smoke tests remain opt-in for local sessions via `BORROWED_LIGHT_GNOME_SMOKE=1`; hosted CI does not have a real wallpaper session. The workflow builds the extension without publishing it to the Marketplace.
+
 ## Extension points
 
 - `WallpaperProvider` and `providerRegistry` isolate desktop detection, current-image resolution, and optional notifications. Add Windows, macOS, or another Linux desktop provider without modifying the color pipeline.
