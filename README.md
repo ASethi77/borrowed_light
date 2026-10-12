@@ -44,11 +44,14 @@ The preview updates your actual editor and workbench as you make changes.
 | ↑/↓ or the rule arrows | Analogous, Monochromatic, Triad, Complementary, Compound, or Shades |
 | Light/dark button | Theme appearance |
 | Primary color buttons | The main hue, cycling through wallpaper and color-rule choices; light and dark remember separate choices |
+| Border button (panel icon) | Mellow, Balanced, or Vibrant pane-border contrast, independent of syntax colors |
 | Syntax button (keyword icon) | Mellow, Balanced, Vibrant, or Vibrant Alternate highlighting |
 | **Enter** | Keep the preview and save your choices |
 | **Escape** or click outside | Return to your starting theme |
 
 **Mellow** uses soft colors, **Balanced** adds moderate colorfulness, and **Vibrant** gives syntax categories more distinct colors. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
+
+Border contrast is a separate preference, shared between light and dark themes. **Mellow** gives subtle muted separators, **Balanced** gives moderately visible muted separators, and **Vibrant** preserves the original strong wallpaper-colored outlines. Focus indicators and control outlines stay visible. Cycle the border button to preview the change and press Enter to save; Escape or clicking outside restores your earlier borders. The saved choice persists across wallpaper syncs and syntax/color-rule changes. The default remains Vibrant until you choose another setting.
 
 Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds. Windows checks every 30 seconds; GNOME also listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
 

@@ -179,7 +179,7 @@ suite('Borrowed Light extension host', () => {
             await waitFor('triad');
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
-            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'balanced' });
+            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'vibrant' });
             assert.equal(config().get('borrowed-light.harmony'), 'triad');
             assert.equal(config().get('borrowed-light.appearance'), 'dark');
             assert.deepEqual(errors, []);
@@ -273,6 +273,56 @@ suite('Borrowed Light extension host', () => {
             for (const section of sections) { assert.deepEqual(config().inspect(section)?.globalValue, baseline[section], section); }
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); await vscode.commands.executeCommand('workbench.action.closeAllEditors'); }
+    });
+    test('border contrast previews independently, saves only on accept, and cancels without changing the saved preference', async () => {
+        const app = new ThemeApplication(new Memory());
+        const swatches = [{ hex: parseHexColorCode('#2288bb'), weight: 1 }];
+        await config().update('borrowed-light.borderContrast', 'balanced', vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.syntaxStyle', 'vibrant', vscode.ConfigurationTarget.Global);
+        let writes = Promise.resolve();
+        const errors: unknown[] = [];
+        let ready = false;
+        const start = (borders: 'balanced' | 'mellow') => {
+            ready = false;
+            return createPreviewPicker({
+                application: app,
+                prepare: async () => ({ variants: generateVariants(swatches, undefined, 'vibrant', borders), harmony: 'analogous', appearance: 'dark', syntaxStyle: 'vibrant', borderContrast: borders }),
+                enqueue: action => { const next = writes.then(async () => { await action(); ready = true; }); writes = next.catch(() => {}); return next; },
+                generate: (swatches, rule, mode, primary, signal, syntax, borders) => runVariant(join(__dirname, '../../dist/palette-worker.js'), swatches, rule, mode, primary, signal, syntax, borders),
+                error: error => { errors.push(error); },
+            });
+        };
+        const waitFor = async (borders: 'balanced' | 'mellow' | 'vibrant', mode: 'dark' | 'light' = 'dark', syntax: 'vibrant' | 'vibrant-alt' = 'vibrant') => {
+            const expected = generateVariant(swatches, 'analogous', mode, 'automatic', syntax, borders).theme;
+            const matches = () => ready && app.active === themeNames[mode] && JSON.stringify(config().inspect<Values>('workbench.colorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`]) === JSON.stringify(expected.colors) && JSON.stringify((config().inspect<Values>('editor.semanticTokenColorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`] as Values | undefined)?.rules) === JSON.stringify(expected.semanticRules);
+            const deadline = Date.now() + 10000;
+            while (!matches() && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 50)); }
+            assert.ok(matches(), `${mode}/${syntax}/${borders}`);
+            // Verify the syntax output has not changed when cycling only borders.
+            assert.deepEqual((config().inspect<Values>('editor.semanticTokenColorCustomizations')?.globalValue?.[`[${themeNames[mode]}]`] as Values)?.rules, expected.semanticRules);
+        };
+        let picker = start('balanced');
+        try {
+            await waitFor('balanced');
+            picker.cycleBorders(-1); await waitFor('mellow');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'balanced');
+            assert.equal(config().get('borrowed-light.syntaxStyle'), 'vibrant');
+            picker.toggleAppearance(); await waitFor('mellow', 'light');
+            picker.cycleSyntax(); await waitFor('mellow', 'light', 'vibrant-alt');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'balanced');
+            picker.cycleSyntax(-1); await waitFor('mellow', 'light');
+            await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
+            assert.equal((await picker.closed)?.borderContrast, 'mellow');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+            const baseline = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
+            picker = start('mellow'); await waitFor('mellow');
+            picker.cycleBorders(); picker.cycleBorders(); await waitFor('vibrant');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+            await vscode.commands.executeCommand('workbench.action.closeQuickOpen');
+            assert.equal(await picker.closed, undefined);
+            for (const section of sections) { assert.deepEqual(config().inspect(section)?.globalValue, baseline[section], section); }
+            assert.deepEqual(errors, []);
+        } finally { await picker.cancel(); await app.restore(); }
     });
     test('Python HTML documents expose HTML, JS and CSS scopes while ordinary strings remain Python', async () => {
         const app = new ThemeApplication(new Memory());

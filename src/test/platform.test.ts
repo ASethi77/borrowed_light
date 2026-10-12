@@ -18,13 +18,20 @@ suite('Native desktop wallpaper smoke test', () => {
         assert.ok((await stat(wallpaperPath(wallpaper.uri))).isFile());
         assert.ok(['light', 'dark'].includes(wallpaper.appearance));
         const config = () => vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.platformProvider'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.platformProvider', 'borrowed-light.borderContrast'];
         const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
         try {
             // Force automatic selection for this test, then restore the user's preference.
             await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
             await config().update('borrowed-light.platformProvider', 'auto', vscode.ConfigurationTarget.Global);
+            await config().update('borrowed-light.borderContrast', 'mellow', vscode.ConfigurationTarget.Global);
             await vscode.commands.executeCommand('borrowed-light.sync');
+            const theme = config().get<string>('workbench.colorTheme');
+            const border = config().inspect<Record<string, Record<string, string>>>('workbench.colorCustomizations')?.globalValue?.[`[${theme}]`]?.['panel.border'];
+            assert.ok(border);
+            await vscode.commands.executeCommand('borrowed-light.sync');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+            assert.equal(config().inspect<Record<string, Record<string, string>>>('workbench.colorCustomizations')?.globalValue?.[`[${theme}]`]?.['panel.border'], border);
             assert.ok(['Borrowed Light (Dark)', 'Borrowed Light (Light)'].includes(vscode.workspace.getConfiguration().get<string>('workbench.colorTheme') ?? ''));
             await vscode.commands.executeCommand('borrowed-light.report');
         } finally {

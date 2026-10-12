@@ -190,3 +190,16 @@ test('native file normalization bypasses source reads and propagates errors', as
     decoder.fromFile = async () => { throw new Error('normalization failed'); };
     await assert.rejects(runPipeline(worker, path, 'analogous', 'dark', undefined, 'automatic', 'balanced', decoder), /normalization failed/);
 });
+
+test('worker retains the independent border preference across appearance and syntax variants', async () => {
+    const swatches = [{ hex: parseHexColorCode('#2288bb'), weight: 1 }];
+    const worker = resolve('dist/palette-worker.js');
+    const result = await runVariant(worker, swatches, 'analogous', 'light', 'automatic', undefined, 'vibrant', 'mellow');
+    assert.equal(result.borderContrast, 'mellow');
+    assert.deepEqual(result, generateVariant(swatches, 'analogous', 'light', 'automatic', 'vibrant', 'mellow'));
+    const previews = await runPreviews(worker, { swatches }, undefined, undefined, 'vibrant', undefined, 'mellow');
+    for (const modes of Object.values(previews)) {
+        for (const variant of Object.values(modes)) { assert.equal(variant.borderContrast, 'mellow'); }
+    }
+    assert.deepEqual(previews.analogous.light, result);
+});

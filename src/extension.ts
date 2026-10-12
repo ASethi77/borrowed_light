@@ -57,7 +57,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!isPrimaryChoice(primaries.dark) || !isPrimaryChoice(primaries.light)) { throw new Error('Unknown primary color setting'); }
         const syntaxStyle = config.get<SyntaxStyle>('syntaxStyle', 'balanced');
         if (!syntaxStyles.includes(syntaxStyle)) { throw new Error('Unknown syntax style setting'); }
-        const borderContrast = config.get<BorderContrast>('borderContrast', 'balanced');
+        const borderContrast = config.get<BorderContrast>('borderContrast', 'vibrant');
         if (!borderContrasts.includes(borderContrast)) { throw new Error('Unknown border contrast setting'); }
         const requested = config.get<string>('appearance', 'dark');
         if (!['dark', 'light', 'desktop'].includes(requested)) { throw new Error('Unknown appearance setting'); }

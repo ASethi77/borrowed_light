@@ -182,3 +182,23 @@ test('a green-only wallpaper still gives six distinguishable vibrant token famil
         }
     }
 });
+
+test('border contrast changes pane separators independently of syntax, surfaces and focus visibility', () => {
+    const decorative = new Set(['editorGroup.border', 'panel.border', 'widget.border', 'notifications.border', 'surface.border']);
+    for (const appearance of ['light', 'dark'] as const) {
+        const variants = (['mellow', 'balanced', 'vibrant'] as const).map(borders => generateVariant(swatches, 'analogous', appearance, 'automatic', 'vibrant', borders));
+        const withoutBorders = (colors: Record<string, string>) => Object.fromEntries(Object.entries(colors).filter(([key]) => !decorative.has(key)));
+        for (const variant of variants) {
+            assert.deepEqual(withoutBorders(variant.theme.colors), withoutBorders(variants[0].theme.colors));
+            assert.deepEqual(variant.theme.textMateRules, variants[0].theme.textMateRules);
+            assert.deepEqual(variant.theme.semanticRules, variants[0].theme.semanticRules);
+            assert.ok(variant.theme.checks.every(check => check.ratio >= check.minimum));
+            assert.ok(contrastRatio(variant.theme.colors.focusBorder, variant.theme.colors['editor.background']) >= 3);
+        }
+        const ratios = variants.map(variant => contrastRatio(variant.theme.colors['panel.border'], variant.theme.colors['panel.background']));
+        assert.ok(ratios[0] < ratios[1] && ratios[1] < ratios[2], JSON.stringify(ratios));
+        const syntaxChange = generateVariant(swatches, 'analogous', appearance, 'automatic', 'mellow', 'mellow');
+        assert.deepEqual(syntaxChange.theme.colors, variants[0].theme.colors);
+        assert.notDeepEqual(syntaxChange.theme.textMateRules, variants[0].theme.textMateRules);
+    }
+});

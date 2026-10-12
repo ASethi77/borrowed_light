@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.10
+
+- Add an independent Mellow/Balanced/Vibrant border contrast control to the preview toolbar.
+- Save border preferences on preview acceptance and retain them across wallpaper syncs, color rules, light/dark modes, and syntax changes.
+- Restore borders and preferences on Escape or dismissal; keep keyboard focus and control indicators visible.
+- Default to Vibrant to preserve the previous border appearance until a new preference is accepted.
+
 ## 0.0.9
 
 - Resolve modern macOS wallpaper selections from the local wallpaper store instead of using stale DefaultDesktop images.

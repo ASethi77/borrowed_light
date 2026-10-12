@@ -38,7 +38,7 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
     let appearance: Appearance = 'dark', harmony: Harmony = 'analogous';
     let primaries: PrimaryChoices = { dark: 'automatic', light: 'automatic' };
     let syntaxStyle: SyntaxStyle = 'balanced';
-    let borderContrast: BorderContrast = 'balanced';
+    let borderContrast: BorderContrast = 'vibrant';
     let generation: AbortController | undefined;
     const cache = new Map<string, PaletteResult>();
     let revision = 0, appliedKey = '', requestedKey = '';
