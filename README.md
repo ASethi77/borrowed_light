@@ -35,6 +35,13 @@ Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpa
 
 The initial theme is dark with the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
 
+For quick settings changes, use the Command Palette:
+
+- **Borrowed Light: Toggle Automatic Wallpaper Sync** turns wallpaper monitoring on or off.
+- **Borrowed Light: Toggle Following Desktop Light/Dark Appearance** switches between following the desktop and keeping the currently visible light/dark appearance.
+
+The toggles save your preferences independently. Following desktop changes automatically requires automatic sync; with it off, run Sync manually. Border and syntax preferences stay unchanged.
+
 ## Make it your own
 
 The preview updates your actual editor and workbench as you make changes.

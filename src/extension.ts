@@ -151,6 +151,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         previewStatus,
         vscode.commands.registerCommand('borrowed-light.preview', openPreview),
         vscode.commands.registerCommand('borrowed-light.sync', async () => { await preview?.cancel(); await sync(true); }),
+        vscode.commands.registerCommand('borrowed-light.toggleAutoSync', async () => {
+            await preview?.cancel();
+            try {
+                await serialized(async () => {
+                    const enabled = !settings().get<boolean>('autoSync', false);
+                    await settings().update('autoSync', enabled, vscode.ConfigurationTarget.Global);
+                    void vscode.window.showInformationMessage(enabled
+                        ? `Automatic wallpaper sync enabled.${application.ownedThemeActive ? '' : ' Run Sync Theme from Wallpaper to select Borrowed Light.'}`
+                        : 'Automatic wallpaper sync disabled.');
+                });
+            } catch (value) { error(value, true); }
+        }),
+        vscode.commands.registerCommand('borrowed-light.toggleDesktopAppearance', async () => {
+            await preview?.cancel();
+            try {
+                await serialized(async () => {
+                    const following = settings().get<string>('appearance', 'dark') !== 'desktop';
+                    // Turning following off freezes the currently visible appearance.
+                    const light = application.active === themeNames.light || (application.active !== themeNames.dark &&
+                        [vscode.ColorThemeKind.Light, vscode.ColorThemeKind.HighContrastLight].includes(vscode.window.activeColorTheme.kind));
+                    await settings().update('appearance', following ? 'desktop' : light ? 'light' : 'dark', vscode.ConfigurationTarget.Global);
+                    void vscode.window.showInformationMessage(following
+                        ? `Following desktop light/dark appearance.${settings().get<boolean>('autoSync', false) ? '' : ' Enable automatic sync to track desktop changes, or run Sync manually.'}`
+                        : `Desktop appearance following disabled. Keeping ${light ? 'light' : 'dark'} appearance.`);
+                });
+            } catch (value) { error(value, true); }
+        }),
         vscode.commands.registerCommand('borrowed-light.report', async () => {
             await preview?.cancel();
             const reportAbort = new AbortController();

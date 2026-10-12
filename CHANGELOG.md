@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.11
+
+- Add Command Palette toggles for automatic wallpaper sync and following desktop light/dark appearance.
+- Show the new setting state after toggling; disabling desktop following keeps the currently visible light/dark appearance.
+- Keep both toggles independent and retain border/syntax preferences.
+
 ## 0.0.10
 
 - Add an independent Mellow/Balanced/Vibrant border contrast control to the preview toolbar.

@@ -36,16 +36,46 @@ suite('Borrowed Light extension host', () => {
     teardown(async () => {
         for (const section of sections) { await config().update(section, originals[section], vscode.ConfigurationTarget.Global); }
     });
-    test('extension loads with all four commands and both theme contributions', async () => {
+    test('extension loads with all six commands and both theme contributions', async () => {
         const extension = vscode.extensions.getExtension('borrowed-light-local.borrowed-light');
         assert.ok(extension);
         await extension.activate();
         assert.equal(extension.packageJSON.displayName, 'Borrowed Light');
         const commands = await vscode.commands.getCommands(true);
-        for (const name of ['sync', 'report', 'restore', 'preview']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
+        for (const name of ['sync', 'report', 'restore', 'preview', 'toggleAutoSync', 'toggleDesktopAppearance']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
         assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { label: string }) => theme.label), Object.values(themeLabels));
         assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { id: string }) => theme.id), Object.values(themeNames));
         assert.ok(extension.packageJSON.contributes.commands.every((command: { title: string }) => command.title.startsWith('Borrowed Light:')));
+    });
+    test('Command Palette toggles automatic sync without changing appearance or border/syntax preferences', async () => {
+        await config().update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.appearance', 'desktop', vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.borderContrast', 'mellow', vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.syntaxStyle', 'vibrant', vscode.ConfigurationTarget.Global);
+        await vscode.commands.executeCommand('borrowed-light.toggleAutoSync');
+        assert.equal(config().inspect('borrowed-light.autoSync')?.globalValue, true);
+        await vscode.commands.executeCommand('borrowed-light.toggleAutoSync');
+        assert.equal(config().inspect('borrowed-light.autoSync')?.globalValue, false);
+        assert.equal(config().get('borrowed-light.appearance'), 'desktop');
+        assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+        assert.equal(config().get('borrowed-light.syntaxStyle'), 'vibrant');
+    });
+    test('Command Palette toggles desktop appearance independently and freezes the active light/dark theme', async () => {
+        await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.borderContrast', 'mellow', vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.syntaxStyle', 'vibrant', vscode.ConfigurationTarget.Global);
+        for (const appearance of ['light', 'dark'] as const) {
+            await config().update('workbench.colorTheme', themeNames[appearance], vscode.ConfigurationTarget.Global);
+            await config().update('borrowed-light.appearance', appearance, vscode.ConfigurationTarget.Global);
+            await vscode.commands.executeCommand('borrowed-light.toggleDesktopAppearance');
+            assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, 'desktop');
+            await vscode.commands.executeCommand('borrowed-light.toggleDesktopAppearance');
+            assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, appearance);
+        }
+        assert.equal(config().get('borrowed-light.autoSync'), false);
+        assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+        assert.equal(config().get('borrowed-light.syntaxStyle'), 'vibrant');
     });
     test('live customization merge and restart-safe restoration preserve unrelated settings', async () => {
         const original = { '[Other]': { 'editor.background': '#123456' } };
