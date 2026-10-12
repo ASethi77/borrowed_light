@@ -10,6 +10,7 @@ import { detectPlatform } from './platform/os_detect';
 import { wallpaperPath } from './image/source';
 import { reportHtml } from './report';
 import { themeNames } from './color/theme';
+import { WallpaperPrimaries } from './wallpaper_preferences';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const output = vscode.window.createOutputChannel('Borrowed Light');
@@ -17,6 +18,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let provider = await selectProvider(platform, vscode.workspace.getConfiguration('borrowed-light').get('platformProvider', 'auto'));
     output.appendLine(`Platform: ${platform.os}/${platform.desktop}; provider: ${provider.id}`);
     const application = new ThemeApplication(context.globalState);
+    const wallpaperPrimaries = new WallpaperPrimaries(context.globalState);
     try { await application.recoverPreview(); } catch (value) { output.appendLine(`Could not restore an interrupted preview: ${String(value)}`); }
     const workerPath = context.asAbsolutePath('dist/palette-worker.js');
     let disposed = false, revision = 0, signature = '', lastError = '';
@@ -45,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         lastError = message;
         if (manual) { void vscode.window.showErrorMessage(`Borrowed Light: ${message}`); }
     };
-    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast }> => {
+    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; resetPrimaries: boolean; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast }> => {
         // Wait for the latest override probe before manual sync/report/preview reads.
         let pending: Promise<void>;
         do { pending = providerUpdate; await pending; } while (pending !== providerUpdate);
@@ -53,19 +55,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const config = settings();
         const harmony = config.get<Harmony>('harmony', 'analogous');
         if (!harmonies.includes(harmony)) { throw new Error('Unknown harmony setting'); }
-        const primaries: PrimaryChoices = { dark: config.get('primaryDark', 'automatic'), light: config.get('primaryLight', 'automatic') };
-        if (!isPrimaryChoice(primaries.dark) || !isPrimaryChoice(primaries.light)) { throw new Error('Unknown primary color setting'); }
+        const requestedPrimaries: PrimaryChoices = { dark: config.get('primaryDark', 'automatic'), light: config.get('primaryLight', 'automatic') };
+        if (!isPrimaryChoice(requestedPrimaries.dark) || !isPrimaryChoice(requestedPrimaries.light)) { throw new Error('Unknown primary color setting'); }
         const syntaxStyle = config.get<SyntaxStyle>('syntaxStyle', 'balanced');
         if (!syntaxStyles.includes(syntaxStyle)) { throw new Error('Unknown syntax style setting'); }
         const borderContrast = config.get<BorderContrast>('borderContrast', 'vibrant');
         if (!borderContrasts.includes(borderContrast)) { throw new Error('Unknown border contrast setting'); }
-        const requested = config.get<string>('appearance', 'dark');
+        const requested = config.get<string>('appearance', 'desktop');
         if (!['dark', 'light', 'desktop'].includes(requested)) { throw new Error('Unknown appearance setting'); }
         const wallpaper = await provider.current();
         const appearance = requested === 'desktop' ? wallpaper.appearance : requested as Appearance;
         const path = wallpaperPath(wallpaper.uri), metadata = await stat(path);
         const sourceSignature = JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino]);
-        return { wallpaper, path, harmony, appearance, primaries, syntaxStyle, borderContrast, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle, borderContrast]) };
+        const { primaries, reset: resetPrimaries } = wallpaperPrimaries.resolve(sourceSignature, requestedPrimaries);
+        return { wallpaper, path, harmony, appearance, primaries, resetPrimaries, syntaxStyle, borderContrast, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle, borderContrast]) };
     };
     const sync = async (manual: boolean): Promise<void> => {
         if (disposed || preview || previewOpening || (!manual && (!settings().get<boolean>('autoSync') || !application.ownedThemeActive))) { return; }
@@ -84,6 +87,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 if (currentRevision !== revision || disposed || (!manual && !application.ownedThemeActive)) { return; }
                 const applied = await application.apply(result.theme, () => currentRevision === revision && !disposed && (manual || application.ownedThemeActive));
                 if (!applied) { return; }
+                if (source.resetPrimaries) {
+                    await settings().update('primaryDark', 'automatic', vscode.ConfigurationTarget.Global);
+                    await settings().update('primaryLight', 'automatic', vscode.ConfigurationTarget.Global);
+                    output.appendLine('Wallpaper changed; primary colors reset to automatic.');
+                }
+                await wallpaperPrimaries.remember(source.sourceSignature);
                 signature = source.signature; lastError = '';
                 output.appendLine(`Applied ${result.theme.appearance} ${source.harmony} theme from ${source.wallpaper.uri}`);
                 if (manual) {
@@ -137,6 +146,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (preview === picker) { preview = undefined; }
         if (disposed) { return; }
         if (choice && source && variants) {
+            try { await wallpaperPrimaries.remember(source.sourceSignature); }
+            catch (value) { error(value, true); }
             signature = ''; cached = undefined;
             output.appendLine(`Kept ${choice.appearance} ${choice.harmony} wallpaper preview`);
         }
@@ -167,7 +178,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             await preview?.cancel();
             try {
                 await serialized(async () => {
-                    const following = settings().get<string>('appearance', 'dark') !== 'desktop';
+                    const following = settings().get<string>('appearance', 'desktop') !== 'desktop';
                     // Turning following off freezes the currently visible appearance.
                     const light = application.active === themeNames.light || (application.active !== themeNames.dark &&
                         [vscode.ColorThemeKind.Light, vscode.ColorThemeKind.HighContrastLight].includes(vscode.window.activeColorTheme.kind));

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.12
+
+- Follow desktop light/dark appearance by default.
+- Preserve explicit appearance preferences when accepting color previews; preview light/dark switches are temporary.
+- Scope primary hue selections to the current wallpaper and reset both appearances to automatic after a new wallpaper successfully syncs.
+- Retain hue tweaks for the same wallpaper across syncs/restarts and remember newly accepted preview choices.
+
 ## 0.0.11
 
 - Add Command Palette toggles for automatic wallpaper sync and following desktop light/dark appearance.

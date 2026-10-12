@@ -59,7 +59,9 @@ export class ThemeApplication {
     }
     async commitPreview(harmony: Harmony, appearance: Appearance, primaries?: PrimaryChoices, syntaxStyle?: SyntaxStyle, borderContrast?: BorderContrast): Promise<void> {
         try {
-            for (const [key, written] of Object.entries({ 'borrowed-light.harmony': harmony, 'borrowed-light.appearance': appearance, ...(syntaxStyle ? { 'borrowed-light.syntaxStyle': syntaxStyle } : {}), ...(borderContrast ? { 'borrowed-light.borderContrast': borderContrast } : {}), ...(primaries ? { 'borrowed-light.primaryDark': primaries.dark, 'borrowed-light.primaryLight': primaries.light } : {}) })) {
+            // Preview appearance is temporary. Only an explicit appearance setting or
+            // the desktop-following command may change the saved preference.
+            for (const [key, written] of Object.entries({ 'borrowed-light.harmony': harmony, ...(syntaxStyle ? { 'borrowed-light.syntaxStyle': syntaxStyle } : {}), ...(borderContrast ? { 'borrowed-light.borderContrast': borderContrast } : {}), ...(primaries ? { 'borrowed-light.primaryDark': primaries.dark, 'borrowed-light.primaryLight': primaries.light } : {}) })) {
                 const config = vscode.workspace.getConfiguration();
                 const saved = this.state.get<PreviewJournal>(previewKey);
                 if (!saved) { throw new Error('Preview session is no longer active'); }

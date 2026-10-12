@@ -33,7 +33,7 @@ Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpa
 2. Open the Command Palette and run **Borrowed Light: Sync Theme from Wallpaper**.
 3. Click **Borrowed Light** in the status bar, or run **Borrowed Light: Preview Color Schemes**, to explore alternatives.
 
-The initial theme is dark with the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
+The initial theme follows desktop light/dark appearance and uses the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
 
 For quick settings changes, use the Command Palette:
 
@@ -49,14 +49,18 @@ The preview updates your actual editor and workbench as you make changes.
 | Preview control | What it changes |
 | --- | --- |
 | ↑/↓ or the rule arrows | Analogous, Monochromatic, Triad, Complementary, Compound, or Shades |
-| Light/dark button | Theme appearance |
-| Primary color buttons | The main hue, cycling through wallpaper and color-rule choices; light and dark remember separate choices |
+| Light/dark button | Temporary preview appearance; keeps your saved light/dark/desktop preference |
+| Primary color buttons | The main hue, cycling through wallpaper and color-rule choices; light and dark remember separate choices for the current wallpaper |
 | Border button (panel icon) | Mellow, Balanced, or Vibrant pane-border contrast, independent of syntax colors |
 | Syntax button (keyword icon) | Mellow, Balanced, Vibrant, or Vibrant Alternate highlighting |
 | **Enter** | Keep the preview and save your choices |
 | **Escape** or click outside | Return to your starting theme |
 
 **Mellow** uses soft colors, **Balanced** adds moderate colorfulness, and **Vibrant** gives syntax categories more distinct colors. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
+
+Accepting a preview never overwrites `borrowed-light.appearance`, including an unset default or `desktop`. Use the desktop-following command or Settings to change that preference explicitly. Turning following off saves the current editor’s light/dark mode.
+
+Primary hue tweaks are specific to the wallpaper. Syncing a new image (including replacing the file at the same path) resets both light and dark primary choices to `automatic`. Syncing the same wallpaper keeps your tweaks, including across restarts; accepting a new preview can override the automatic choices again. Syntax, border contrast, and color-rule preferences are retained.
 
 Border contrast is a separate preference, shared between light and dark themes. **Mellow** gives subtle muted separators, **Balanced** gives moderately visible muted separators, and **Vibrant** preserves the original strong wallpaper-colored outlines. Focus indicators and control outlines stay visible. Cycle the border button to preview the change and press Enter to save; Escape or clicking outside restores your earlier borders. The saved choice persists across wallpaper syncs and syntax/color-rule changes. The default remains Vibrant until you choose another setting.
 

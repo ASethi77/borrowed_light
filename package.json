@@ -2,7 +2,7 @@
   "name": "borrowed-light",
   "displayName": "Borrowed Light",
   "description": "Generate harmonious, readable VS Code themes from your desktop wallpaper",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "repository": {
     "type": "git",
     "url": "https://github.com/ASethi77/borrowed_light.git"
@@ -83,7 +83,7 @@
             "light",
             "desktop"
           ],
-          "default": "dark",
+          "default": "desktop",
           "scope": "application",
           "description": "Generated theme appearance. Desktop follows the local platform's light/dark preference."
         },
@@ -113,7 +113,7 @@
           ],
           "default": "automatic",
           "scope": "application",
-          "description": "Primary surface/accent color for dark mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
+          "description": "Primary surface/accent color for dark mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Both primary choices reset to automatic when a new wallpaper syncs. Use the preview toolbar to cycle colors."
         },
         "borrowed-light.primaryLight": {
           "type": "string",
@@ -135,7 +135,7 @@
           ],
           "default": "automatic",
           "scope": "application",
-          "description": "Primary surface/accent color for light mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Use the preview toolbar to cycle colors."
+          "description": "Primary surface/accent color for light mode. Wallpaper slots follow extracted weight order; harmony slots follow the selected rule. Missing wallpaper slots fall back to automatic. Both primary choices reset to automatic when a new wallpaper syncs. Use the preview toolbar to cycle colors."
         },
         "borrowed-light.syntaxStyle": {
           "type": "string",
@@ -209,7 +209,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out borrowed-light-0.0.11.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out borrowed-light-0.0.12.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

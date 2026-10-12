@@ -44,7 +44,7 @@ New requests cancel superseded workers. Revision checks prevent stale results fr
 
 The preview prepares all twelve harmony/appearance combinations from one extraction. Primary-hue and syntax-style changes reuse the extracted swatches and cache results for the session. Automatic application waits while the picker is open. A preview starts in the currently active Borrowed Light appearance, even if the saved preference differs.
 
-Enter saves the selected rule, appearance, independent light/dark primary choices, and shared syntax style and border contrast. Escape restores the starting configuration. A preview journal supports recovery after interruption when the extension next activates.
+Enter saves the selected rule, independent light/dark primary choices, and shared syntax style and border contrast. Escape restores the starting configuration. A preview journal supports recovery after interruption when the extension next activates.
 
 Generated workbench, TextMate, and semantic-token colors live in theme-specific user-settings blocks. The ownership ledger records original values and the extension's last writes before mutations. Restore removes or reverts only values that still match those writes, preserving later manual edits and unrelated settings. Explicit Sync can overwrite generated keys again.
 
@@ -57,9 +57,9 @@ All preferences are application-scoped under `borrowed-light.*`.
 | Setting suffix | Default | Values |
 | --- | --- | --- |
 | `harmony` | `analogous` | `analogous`, `monochromatic`, `triad`, `complementary`, `compound`, `shades` |
-| `appearance` | `dark` | `dark`, `light`, `desktop` |
+| `appearance` | `desktop` | `dark`, `light`, `desktop` |
 | `primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
-| `primaryLight` | `automatic` | Same source slots, remembered independently |
+| `primaryLight` | `automatic` | Same source slots, remembered independently for the current wallpaper |
 | `syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
 | `borderContrast` | `vibrant` | `mellow`, `balanced`, `vibrant`; independent decorative pane contrast |
 | `platformProvider` | `auto` | `auto`, `windows`, `macos`, `linux-gnome`; overrides must match the host OS |
@@ -163,3 +163,5 @@ These checks cover controlled theme roles, not every rendered pixel or an overal
 See [Developing](DEVELOPING.md) for build and test workflows, or return to the [user guide](README.md).
 
 Decorative pane/widget borders have an independent `borderContrast` preference. Mellow and Balanced use muted surface hues with custom minimum contrast targets of 1.15:1 and 1.5:1 against editor, panel, and field surfaces. Vibrant preserves the original indicator color. Keyboard focus, search matches, and control outlines keep the existing indicator contrast policy. Border preference is included in pipeline inputs, preview caches, signatures, and the report; only accepting a preview writes its new setting.
+
+Preview light/dark appearance is transient: committing a preview never writes the appearance preference. The desktop-following command freezes the active editor appearance when following is turned off. `WallpaperPrimaries` persists the last successfully used source signature separately from appearance/syntax; a changed source uses automatic primaries, and a successful sync resets both primary settings. Accepted previews bind their hue choices to the source they sampled. Failed syncs and cancelled previews do not advance the binding. Existing unbound preferences migrate on the first successful sync.

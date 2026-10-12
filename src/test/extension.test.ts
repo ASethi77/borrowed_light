@@ -125,18 +125,48 @@ suite('Borrowed Light extension host', () => {
         for (const section of sections) { assert.deepEqual(config().inspect(section)?.globalValue, before[section], section); }
         assert.deepEqual(app.ledger, ledger);
     });
-    test('keeping a preview saves rule and appearance and preserves the original restore baseline', async () => {
+    test('keeping a preview saves the rule, preserves appearance preference and the original restore baseline', async () => {
         const before = Object.fromEntries(customizationSections.map(section => [section, config().inspect(section)?.globalValue]));
         const app = new ThemeApplication(new Memory());
         await app.apply(generateTheme(palette, 'dark'));
         await app.beginPreview();
         await app.apply(generateTheme(palette, 'light'));
+        const appearanceBefore = config().inspect('borrowed-light.appearance')?.globalValue;
         await app.commitPreview('triad', 'light');
         assert.equal(config().get('borrowed-light.harmony'), 'triad');
-        assert.equal(config().get('borrowed-light.appearance'), 'light');
+        assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, appearanceBefore);
         assert.equal(app.active, themeNames.light);
         await app.restore();
         for (const section of customizationSections) { assert.deepEqual(config().inspect(section)?.globalValue, before[section]); }
+    });
+    test('accepting preview hue/syntax/border changes never writes an unset, desktop, or fixed appearance preference', async () => {
+        await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+        for (const preference of [undefined, 'desktop', 'light', 'dark']) {
+            await config().update('borrowed-light.appearance', preference, vscode.ConfigurationTarget.Global);
+            if (preference === undefined) { assert.equal(config().get('borrowed-light.appearance'), 'desktop'); }
+            const app = new ThemeApplication(new Memory());
+            await app.beginPreview();
+            await app.apply(generateTheme(palette, preference === 'light' ? 'dark' : 'light'));
+            await app.commitPreview('triad', preference === 'light' ? 'dark' : 'light', { light: 'wallpaper-2', dark: 'harmony-3' }, 'vibrant', 'mellow');
+            assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, preference);
+            assert.equal(config().get('borrowed-light.primaryLight'), 'wallpaper-2');
+            assert.equal(config().get('borrowed-light.primaryDark'), 'harmony-3');
+            assert.equal(config().get('borrowed-light.syntaxStyle'), 'vibrant');
+            assert.equal(config().get('borrowed-light.borderContrast'), 'mellow');
+            await app.restore();
+        }
+    });
+    test('turning off desktop following after an accepted preview saves the actual editor appearance', async () => {
+        await config().update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+        await config().update('borrowed-light.appearance', 'desktop', vscode.ConfigurationTarget.Global);
+        const app = new ThemeApplication(new Memory());
+        await app.beginPreview();
+        await app.apply(generateTheme(palette, 'light'));
+        await app.commitPreview('analogous', 'light');
+        assert.equal(config().get('borrowed-light.appearance'), 'desktop');
+        await vscode.commands.executeCommand('borrowed-light.toggleDesktopAppearance');
+        assert.equal(config().get('borrowed-light.appearance'), 'light');
+        await app.restore();
     });
     test('cancel preview preserves subsequent manual edits and a separately selected theme', async () => {
         const app = new ThemeApplication(new Memory());
@@ -211,7 +241,7 @@ suite('Borrowed Light extension host', () => {
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
             assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'vibrant' });
             assert.equal(config().get('borrowed-light.harmony'), 'triad');
-            assert.equal(config().get('borrowed-light.appearance'), 'dark');
+            assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, originals['borrowed-light.appearance']);
             assert.deepEqual(errors, []);
         } finally { await picker.cancel(); await app.restore(); }
     });
