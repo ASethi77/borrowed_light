@@ -19,11 +19,13 @@ https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
 | Linux | KDE Plasma | Not yet supported |
 | Linux | Xfce, Cinnamon, MATE, and other desktops | Not yet supported |
 | Windows | Windows desktop | Implemented; native desktop validation pending |
-| macOS | macOS desktop | Implemented; native desktop validation pending |
+| macOS | macOS desktop | Validated on a MacBook with Sequoia Sunrise; other macOS versions pending |
 
-Use VS Code **1.128 or later** with a local wallpaper, up to **64 MiB / 32 megapixels**. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
+Use VS Code **1.128 or later** with a local wallpaper. Portable decoding on Windows/Linux supports up to **64 MiB / 32 megapixels**. macOS normalizes local images to thumbnails up to 1024 pixels on the longest edge before palette extraction, so large built-in wallpapers do not hit those source limits. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
 
-Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpaper**. VS Code for the Web, live wallpapers, solid-color backgrounds, and GNOME XML slideshows are unsupported. Windows/macOS use the primary display's wallpaper; GNOME uses its configured wallpaper image. Multi-image files use the first still frame, which may differ from macOS's active dynamic wallpaper frame.
+On modern macOS, selected image and aerial wallpapers are resolved from the local wallpaper store. Aerial wallpapers use Apple’s locally cached preview image; their palette represents that preview rather than the exact live frame. If the preview is missing, open Wallpaper settings to download it and retry. The store format is undocumented and can change between macOS releases.
+
+Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpaper**. VS Code for the Web, live wallpapers other than macOS aerial previews, solid-color backgrounds, and GNOME XML slideshows are unsupported. Windows/macOS use the primary display's wallpaper; GNOME uses its configured wallpaper image. Multi-image files use the first still frame, which may differ from macOS's active dynamic wallpaper frame.
 
 ## Get started
 
@@ -48,7 +50,7 @@ The preview updates your actual editor and workbench as you make changes.
 
 **Mellow** uses soft colors, **Balanced** adds moderate colorfulness, and **Vibrant** gives syntax categories more distinct colors. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
 
-Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. Windows/macOS check for changes every 30 seconds; GNOME also listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
+Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds. Windows checks every 30 seconds; GNOME also listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
 
 ## Demos
 

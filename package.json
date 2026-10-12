@@ -2,7 +2,7 @@
   "name": "borrowed-light",
   "displayName": "Borrowed Light",
   "description": "Generate harmonious, readable VS Code themes from your desktop wallpaper",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "repository": {
     "type": "git",
     "url": "https://github.com/ASethi77/borrowed_light.git"
@@ -193,7 +193,7 @@
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",
-    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out borrowed-light-0.0.8.vsix"
+    "vsix": "vsce package --no-dependencies --allow-missing-repository --skip-license --out borrowed-light-0.0.9.vsix"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

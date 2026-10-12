@@ -38,6 +38,7 @@ export interface PaletteResult { swatches: Swatch[]; palette: HexColorCode[]; ne
 export type PreviewVariants = Record<Harmony, Record<Appearance, PaletteResult>>;
 export interface PipelineInput {
     path?: string;
+    nativeFileDecode?: boolean;
     swatches?: Swatch[];
     harmony?: Harmony;
     appearance?: Appearance;

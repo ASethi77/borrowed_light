@@ -1,6 +1,6 @@
 import { parseHexColorCode } from './color/code';
 import { parentPort, workerData } from 'node:worker_threads';
-import { decodeImage } from './image/decode';
+import { decodeImage, decodePixels, ImagePixels } from './image/decode';
 import { NativeImageDecoder } from './platform/contracts';
 import { extractRepresentativeColors } from './color/extraction';
 import { PipelineInput } from './model';
@@ -27,7 +27,17 @@ if (parentPort) {
             let swatches = input.swatches?.map(swatch => ({ ...swatch, hex: parseHexColorCode(swatch.hex) }));
             if (!swatches) {
                 if (!input.path) { throw new Error('No wallpaper source'); }
-                const image = await decodeImage(input.path, convertNative);
+                const image = input.nativeFileDecode
+                    ? await new Promise<ImagePixels>((resolve, reject) => {
+                        port.once('message', (message: { png?: Uint8Array; error?: string }) => {
+                            if (message.error) { reject(new Error(message.error)); }
+                            else if (message.png instanceof Uint8Array) {
+                                try { resolve(decodePixels(message.png)); } catch (error) { reject(error); }
+                            } else { reject(new Error('Invalid native decoder reply')); }
+                        });
+                        port.postMessage({ nativeDecodePath: input.path });
+                    })
+                    : await decodeImage(input.path, convertNative);
                 swatches = extractRepresentativeColors(image.data, image.width, image.height);
             }
             port.postMessage({ result: input.previews ? generateVariants(swatches, input.primaries, input.syntaxStyle) : generateVariant(swatches, input.harmony!, input.appearance!, input.primary, input.syntaxStyle) });

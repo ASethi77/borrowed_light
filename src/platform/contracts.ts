@@ -11,4 +11,8 @@ export interface WallpaperProvider {
 /** Convert bounded source bytes to PNG. Process ownership stays in the extension host,
  * so worker termination cannot orphan an OS helper. The signal covers the whole job.
  */
-export type NativeImageDecoder = (bytes: Uint8Array, signal: AbortSignal) => Promise<Uint8Array>;
+export interface NativeImageDecoder {
+    (bytes: Uint8Array, signal: AbortSignal): Promise<Uint8Array>;
+    /** Normalize directly from a local file without loading a large source into the worker. */
+    fromFile?(path: string, signal: AbortSignal): Promise<Uint8Array>;
+}

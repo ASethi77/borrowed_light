@@ -1,16 +1,18 @@
 import { desktopInteropScript } from '../../platform/windows/scripts';
-import { wallpaperScript as macosWallpaperScript, imageScript as macosImageScript } from '../../platform/macos/scripts';
+import { wallpaperScript as macosWallpaperScript } from '../../platform/macos/scripts';
 import { osascriptArguments } from '../../platform/macos/wallpaper';
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
+import { runInNewContext } from 'node:vm';
+import fs = require('node:fs');
+import { EventEmitter } from 'node:events';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runInNewContext } from 'node:vm';
 import { detectPlatform } from '../../platform/os_detect';
 import { providerRegistry, selectProvider, nativeImageDecoder } from '../../platform/os_wallpaper';
 import { WindowsProvider, primaryWallpaperPath, powershellArguments, powershellExecutable } from '../../platform/windows/wallpaper';
-import { MacosProvider } from '../../platform/macos/wallpaper';
+import { MacosProvider, selectedWallpaperUri } from '../../platform/macos/wallpaper';
 import { windowsImageDecoder } from '../../platform/windows/image_decoder';
 import { macosImageDecoder } from '../../platform/macos/image_decoder';
 import { runProcess, ProcessRunner } from '../../platform/process';
@@ -115,43 +117,37 @@ test('native adapters send bytes via stdin with limits and cancellation', async 
         assert.equal(options?.timeoutMs, 15000);
         return Buffer.from('normalized');
     };
-    for (const decoder of [windowsImageDecoder(run), macosImageDecoder(run)]) { assert.equal(Buffer.from(await decoder(source, abort.signal)).toString(), 'normalized'); }
+    assert.equal(Buffer.from(await windowsImageDecoder(run)(source, abort.signal)).toString(), 'normalized');
 });
-test('macOS bridges opaque ImageIO metadata before validating dimensions and decoding', () => {
-    const propertiesRef = Symbol('CFDictionaryRef');
-    const dictionary = Symbol('NSDictionary');
-    const png = { length: 82, isNil: () => false };
-    const source = Symbol('CGImageSourceRef');
-    let dimensions: Record<string, number | undefined> = { PixelWidth: 16, PixelHeight: 16 };
-    let decoded = false, written = false;
-    const context = {
-        ObjC: {
-            import: () => {},
-            castRefToObject: (reference: unknown) => { assert.equal(reference, propertiesRef); return dictionary; },
-            deepUnwrap: (object: unknown) => { assert.equal(object, dictionary, 'unwrap requires the bridged dictionary'); return dimensions; },
-        },
-        $: {
-            NSFileHandle: {
-                fileHandleWithStandardInput: { readDataToEndOfFile: { length: 441 } },
-                fileHandleWithStandardOutput: { writeData: (bytes: unknown) => { assert.equal(bytes, png); written = true; } },
-            },
-            CGImageSourceCreateWithData: () => source,
-            CGImageSourceCopyPropertiesAtIndex: (imageSource: unknown, index: number) => { assert.equal(imageSource, source); assert.equal(index, 0); return propertiesRef; },
-            CGImageSourceCreateImageAtIndex: () => { decoded = true; return Symbol('CGImageRef'); },
-            NSBitmapImageRep: { alloc: { initWithCGImage: () => ({ representationUsingTypeProperties: () => png }) } },
-            NSBitmapImageFileTypePNG: 4,
-            NSDictionary: { dictionary: {} },
-        },
-    };
-    const run = () => runInNewContext(macosImageScript + '\nrun();', context);
-    run(); assert.ok(decoded && written);
-    for (const invalid of [{ PixelWidth: 10000000, PixelHeight: 16 }, { PixelWidth: 0, PixelHeight: 16 }, { PixelWidth: 1.5, PixelHeight: 16 }, {}]) {
-        dimensions = invalid;
-        decoded = false; written = false;
-        assert.throws(run, /32 megapixel|invalid wallpaper dimensions/);
-        assert.equal(decoded, false, 'reject invalid metadata before allocating the raster');
-        assert.equal(written, false);
-    }
+test('macOS normalizes a bounded thumbnail from a literal file path and cleans temporary files', async () => {
+    const source = resolve('src/test/fixtures/green.heic');
+    const signal = new AbortController().signal;
+    let normalized = '';
+    const decoder = macosImageDecoder(async (executable, args, options) => {
+        assert.equal(executable, '/usr/bin/sips');
+        if (args[0] === '-g') { return Buffer.from('pixelWidth: 8000\npixelHeight: 6000'); }
+        assert.equal(args[1], '1024');
+        assert.equal(args[5], source);
+        assert.equal(options?.signal, signal);
+        normalized = args.at(-1)!;
+        await writeFile(normalized, 'thumbnail');
+        return Buffer.alloc(0);
+    });
+    assert.equal(Buffer.from(await decoder.fromFile!(source, signal)).toString(), 'thumbnail');
+    await assert.rejects(readFile(normalized), /ENOENT/);
+});
+test('macOS uses the selected image or local aerial thumbnail instead of a stale API fallback', async () => {
+    const fallback = wallpaperUri('/System/Library/CoreServices/DefaultDesktop.heic');
+    const selected = wallpaperUri('/tmp/tree.heic');
+    assert.equal(await selectedWallpaperUri({ provider: 'com.apple.wallpaper.choice.image', configuration: { url: { relative: selected } } }, fallback), selected);
+    assert.equal(await selectedWallpaperUri({ provider: 'com.apple.wallpaper.choice.image', files: [{ relative: selected }] }, fallback), selected);
+    const id = '6D6834A4-2F0F-479A-B053-7D4DC5CB8EB7';
+    const aerial = { provider: 'com.apple.wallpaper.choice.aerials', configuration: { assetID: id } };
+    const uri = await selectedWallpaperUri(aerial, fallback, '/tmp/home', async path => { assert.ok(path.endsWith(id + '.png')); });
+    assert.ok(wallpaperPath(uri).endsWith(id + '.png'));
+    await assert.rejects(selectedWallpaperUri(aerial, fallback, '/tmp/home', async () => { throw new Error('missing'); }), /No local preview/);
+    await assert.rejects(selectedWallpaperUri({ ...aerial, configuration: { assetID: '../escape' } }, fallback), /identifier/);
+    assert.equal(await selectedWallpaperUri(null, fallback), fallback);
 });
 test('real Windows BMP / macOS HEIC native decoding and malformed input', { skip: !['win32', 'darwin'].includes(process.platform) }, async () => {
     const decoder = nativeImageDecoder()!;
@@ -174,4 +170,36 @@ test('native discovery helper compiles without requiring a configured desktop', 
         ? await runProcess(powershellExecutable(), powershellArguments(desktopInteropScript + "\n[Console]::Write('ready')"))
         : await runProcess('/usr/bin/osascript', osascriptArguments(macosWallpaperScript + "\nfunction run() { return 'ready'; }"));
     assert.equal(output.toString('utf8').trim(), 'ready');
+});
+
+test('macOS reads the desktop appearance preference rather than the helper app appearance', () => {
+    for (const [preference, expected] of [['Dark', 'dark'], [undefined, 'light']]) {
+        const context = {
+            ObjC: { import: () => {}, unwrap: (value: unknown) => value },
+            $: {
+                NSScreen: { screens: { count: 1, objectAtIndex: () => ({}) } },
+                NSWorkspace: { sharedWorkspace: { desktopImageURLForScreen: () => ({ absoluteString: wallpaperUri(path), isNil: () => false }) } },
+                NSUserDefaults: { standardUserDefaults: { stringForKey: () => preference } },
+                NSDictionary: { dictionaryWithContentsOfFile: () => null },
+                NSHomeDirectory: () => '/tmp/home',
+            },
+        };
+        const value = JSON.parse(runInNewContext(macosWallpaperScript + '\nrun();', context));
+        assert.equal(value.appearance, expected);
+    }
+});
+test('macOS watches store replacement, polls appearance, and stops notifications on disposal', context => {
+    const watcher = Object.assign(new EventEmitter(), { closed: false, close() { this.closed = true; } });
+    let notify!: () => void;
+    const replacement = mock.method(fs, 'watch', (_directory: string, callback: () => void) => { notify = callback; return watcher; });
+    context.mock.timers.enable({ apis: ['setInterval'] });
+    let changed = 0, failed = 0;
+    try {
+        const monitor = new MacosProvider().watch(() => changed++, () => failed++);
+        notify(); assert.equal(changed, 1);
+        context.mock.timers.tick(5000); assert.equal(changed, 2);
+        watcher.emit('error', new Error('watch failed')); assert.equal(failed, 1);
+        monitor.dispose(); assert.ok(watcher.closed);
+        notify(); context.mock.timers.tick(10000); assert.equal(changed, 2);
+    } finally { context.mock.timers.reset(); replacement.mock.restore(); }
 });

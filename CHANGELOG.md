@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.9
+
+- Resolve modern macOS wallpaper selections from the local wallpaper store instead of using stale DefaultDesktop images.
+- Use the selected aerial wallpaper's local preview for palette extraction, including Sequoia Sunrise.
+- Watch macOS wallpaper changes and check desktop light/dark appearance every five seconds.
+- Normalize macOS images to thumbnails with the built-in sips utility, allowing large HEIC/JPEG sources without loading them into the palette worker.
+
 ## 0.0.8
 
 - Use Borrowed Light branding throughout the extension UI and documentation.

@@ -1,47 +1,42 @@
-/** AppKit's first NSScreen is the primary/menu-bar display, unlike mainScreen which
- * follows keyboard focus. NSWorkspace is queried on osascript's main thread.
- * https://developer.apple.com/documentation/appkit/nsworkspace/desktopimageurl(for:)
+/** NSWorkspace may report DefaultDesktop.heic for Sonoma+ aerial wallpapers.
+ * Read the selected display's wallpaper store as well; retain the API for older OSes.
+ * The store is an undocumented local format, so return only fields we understand.
  */
 export const wallpaperScript = String.raw`
 ObjC.import('AppKit');
+ObjC.import('CoreGraphics');
 function run() {
     const screens = $.NSScreen.screens;
     if (Number(screens.count) === 0) { throw new Error('No macOS desktop session is available'); }
     const screen = screens.objectAtIndex(0);
     const url = $.NSWorkspace.sharedWorkspace.desktopImageURLForScreen(screen);
-    if (!url || url.isNil()) { throw new Error('macOS primary display has no wallpaper image configured'); }
-    const appearance = $.NSApplication.sharedApplication.effectiveAppearance;
-    const match = appearance.bestMatchFromAppearancesWithNames([$.NSAppearanceNameAqua, $.NSAppearanceNameDarkAqua]);
-    return JSON.stringify({ uri: ObjC.unwrap(url.absoluteString), appearance: ObjC.unwrap(match) === 'NSAppearanceNameDarkAqua' ? 'dark' : 'light' });
-}
-`;
-
-/** Read metadata with ImageIO before creating a raster. Multi-image files deliberately
- * use index 0. AppKit encodes that still image as PNG for the shared portable decoder.
- * https://developer.apple.com/documentation/imageio/cgimagesourcecopypropertiesatindex(_:_:_:)
- */
-export const imageScript = String.raw`
-ObjC.import('AppKit');
-ObjC.import('ImageIO');
-function run() {
-    const data = $.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;
-    if (Number(data.length) > 67108864) { throw new Error('Wallpaper exceeds the 64 MiB input limit'); }
-    const source = $.CGImageSourceCreateWithData(data, null);
-    if (!source) { throw new Error('macOS cannot decode this wallpaper format'); }
-    // ImageIO returns an opaque CFDictionaryRef, not an Objective-C dictionary.
-    // Bridge the toll-free Foundation object before unwrapping its numeric metadata.
-    const propertiesRef = $.CGImageSourceCopyPropertiesAtIndex(source, 0, null);
-    if (!propertiesRef) { throw new Error('macOS cannot read wallpaper dimensions'); }
-    const properties = ObjC.deepUnwrap(ObjC.castRefToObject(propertiesRef));
-    const width = Number(properties.PixelWidth), height = Number(properties.PixelHeight);
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) { throw new Error('macOS returned invalid wallpaper dimensions'); }
-    if (width * height > 32000000) { throw new Error('Wallpaper exceeds the 32 megapixel limit'); }
-    const image = $.CGImageSourceCreateImageAtIndex(source, 0, null);
-    if (!image) { throw new Error('macOS cannot decode this wallpaper frame'); }
-    const representation = $.NSBitmapImageRep.alloc.initWithCGImage(image);
-    const png = representation.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $.NSDictionary.dictionary);
-    if (!png || png.isNil()) { throw new Error('macOS could not normalize the wallpaper'); }
-    if (Number(png.length) > 67108864) { throw new Error('Normalized wallpaper exceeds the 64 MiB output limit'); }
-    $.NSFileHandle.fileHandleWithStandardOutput.writeData(png);
+    const appearance = ObjC.unwrap($.NSUserDefaults.standardUserDefaults.stringForKey('AppleInterfaceStyle')) === 'Dark' ? 'dark' : 'light';
+    let selection = null;
+    const store = $.NSDictionary.dictionaryWithContentsOfFile(ObjC.unwrap($.NSHomeDirectory()) + '/Library/Application Support/com.apple.wallpaper/Store/Index.plist');
+    if (store && !store.isNil()) {
+        const displayID = Number(ObjC.unwrap(screen.deviceDescription.objectForKey('NSScreenNumber')));
+        const uuid = ObjC.unwrap(ObjC.castRefToObject($.CFUUIDCreateString(null, $.CGDisplayCreateUUIDFromDisplayID(displayID))));
+        const displays = store.objectForKey('Displays');
+        let selected = displays && !displays.isNil() ? displays.objectForKey(uuid) : null;
+        if (!selected || selected.isNil()) { selected = store.objectForKey('AllSpacesAndDisplays'); }
+        if (selected && !selected.isNil()) {
+            const desktop = selected.objectForKey('Desktop');
+            const content = desktop && !desktop.isNil() ? desktop.objectForKey('Content') : null;
+            const choices = content && !content.isNil() ? content.objectForKey('Choices') : null;
+            if (choices && !choices.isNil() && Number(choices.count) === 1) {
+                const choice = choices.objectAtIndex(0);
+                const data = choice.objectForKey('Configuration');
+                let configuration = {};
+                if (data && !data.isNil() && Number(data.length)) {
+                    const decoded = $.NSPropertyListSerialization.propertyListWithDataOptionsFormatError(data, 0, null, null);
+                    if (decoded && !decoded.isNil()) { configuration = ObjC.deepUnwrap(decoded); }
+                }
+                const files = choice.objectForKey('Files');
+                selection = { provider: ObjC.unwrap(choice.objectForKey('Provider')), configuration: configuration, files: files && !files.isNil() ? ObjC.deepUnwrap(files) : [] };
+            }
+        }
+    }
+    if ((!url || url.isNil()) && !selection) { throw new Error('macOS primary display has no wallpaper image configured'); }
+    return JSON.stringify({ uri: url && !url.isNil() ? ObjC.unwrap(url.absoluteString) : null, appearance: appearance, selection: selection });
 }
 `;

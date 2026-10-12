@@ -62,7 +62,7 @@ test('malformed, unsupported, oversized PNG and missing files reject without app
     await writeFile(path, large);
     await assert.rejects(decodeImage(path), /megapixel/);
     await assert.rejects(decodeImage(join(directory, 'missing')), /ENOENT/);
-    await assert.rejects(runPipeline(resolve('dist/palette-worker.js'), path, 'analogous', 'dark'), /megapixel/);
+    await assert.rejects(runPipeline(resolve('dist/palette-worker.js'), path, 'analogous', 'dark', undefined, 'automatic', 'balanced', async () => { throw new Error('unexpected native fallback'); }), /megapixel/);
 });
 test('cancelled and superseded worker generations cannot return stale results', async () => {
     const abort = new AbortController(); abort.abort();
@@ -173,4 +173,20 @@ test('job deadline and worker crashes abort an outstanding native conversion', a
         return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('stopped')), { once: true }));
     }), /worker crashed/);
     assert.ok(crashState.signal?.aborted);
+});
+
+test('native file normalization bypasses source reads and propagates errors', async () => {
+    const path = join(tmpdir(), 'native-wallpaper-not-loaded-by-worker');
+    const png = PNG.sync.write(makeImage());
+    let calls = 0;
+    const decoder = Object.assign(async () => { throw new Error('bytes must not be read'); }, {
+        fromFile: async (source: string, signal: AbortSignal) => {
+            assert.equal(source, path); assert.equal(signal.aborted, false); calls++; return png;
+        },
+    });
+    const worker = resolve('dist/palette-worker.js');
+    assert.ok((await runPipeline(worker, path, 'analogous', 'dark', undefined, 'automatic', 'balanced', decoder)).swatches.length);
+    assert.equal(calls, 1);
+    decoder.fromFile = async () => { throw new Error('normalization failed'); };
+    await assert.rejects(runPipeline(worker, path, 'analogous', 'dark', undefined, 'automatic', 'balanced', decoder), /normalization failed/);
 });

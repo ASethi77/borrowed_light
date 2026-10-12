@@ -17,7 +17,7 @@ export function runVariant(workerPath: string, swatches: Swatch[], harmony: Harm
 function runWorker<T>(workerPath: string, input: PipelineInput, signal?: AbortSignal, decoder?: NativeImageDecoder): Promise<T> {
     if (signal?.aborted) { return Promise.reject(new Cancelled()); }
     return new Promise((resolve, reject) => {
-        const worker = new Worker(workerPath, { workerData: input, resourceLimits: { maxOldGenerationSizeMb: 128 } });
+        const worker = new Worker(workerPath, { workerData: { ...input, nativeFileDecode: Boolean(input.path && decoder?.fromFile) }, resourceLimits: { maxOldGenerationSizeMb: 128 } });
         let settled = false, nativeRequested = false;
         const helperAbort = new AbortController();
         const finish = (error?: Error, result?: T) => {
@@ -33,12 +33,15 @@ function runWorker<T>(workerPath: string, input: PipelineInput, signal?: AbortSi
         const timer = setTimeout(() => finish(new Error('Wallpaper processing exceeded 15 seconds. Try a smaller image.')), 15000);
         signal?.addEventListener('abort', abort, { once: true });
         worker.on('message', message => {
-            if (message.nativeDecode) {
+            if (message.nativeDecode || message.nativeDecodePath) {
                 if (settled) { return; }
-                if (nativeRequested || !(message.nativeDecode instanceof Uint8Array) || message.nativeDecode.byteLength > maxBytes) { finish(new Error('Invalid native decoder request')); return; }
+                const fromFile = message.nativeDecodePath !== undefined;
+                if (nativeRequested || (fromFile
+                    ? typeof message.nativeDecodePath !== 'string' || message.nativeDecodePath !== input.path || !decoder?.fromFile
+                    : !(message.nativeDecode instanceof Uint8Array) || message.nativeDecode.byteLength > maxBytes)) { finish(new Error('Invalid native decoder request')); return; }
                 nativeRequested = true;
                 if (!decoder) { worker.postMessage({ error: 'Unsupported wallpaper format on this platform. JPEG/PNG work everywhere; native still-image decoding is available on Windows/macOS.' }); return; }
-                void Promise.resolve().then(() => decoder(message.nativeDecode, helperAbort.signal)).then(png => {
+                void Promise.resolve().then(() => fromFile ? decoder.fromFile!(input.path!, helperAbort.signal) : decoder(message.nativeDecode, helperAbort.signal)).then(png => {
                     if (settled) { return; }
                     if (!(png instanceof Uint8Array) || png.byteLength > maxBytes) { finish(new Error('Normalized wallpaper exceeds the 64 MiB output limit')); return; }
                     const transferred = Uint8Array.from(png);
