@@ -19,7 +19,7 @@ const themeBaselines = [
     { colors: ['#ef1234', '#34abce', '#ffa200'], fingerprint: '5c96b5807531de96f97d4c697ac9c523911cfbd9a7ce110a0b118d46ab79c72b' },
 ];
 
-test('768 generated variants retain their complete pre-refactor outputs', () => {
+test('768 vibrant-border variants retain their complete pre-refactor outputs', () => {
     for (const baseline of themeBaselines) {
         const swatches = baseline.colors.map((hex, index) => ({ hex: parseHexColorCode(hex), weight: index === 0 ? 0.7 : 0.3 / (baseline.colors.length - 1) }));
         const variants = [];
@@ -27,13 +27,13 @@ test('768 generated variants retain their complete pre-refactor outputs', () => 
             for (const appearance of ['dark', 'light'] as const) {
                 for (const syntaxStyle of syntaxStyles) {
                     for (const primary of ['automatic', 'wallpaper-2', 'harmony-5', 'wallpaper-8'] as const) {
-                        variants.push(generateVariant(swatches, harmony, appearance, primary, syntaxStyle));
+                        variants.push(generateVariant(swatches, harmony, appearance, primary, syntaxStyle, 'vibrant'));
                     }
                 }
             }
         }
         const serialized = JSON.stringify(variants, (key, value: unknown) =>
-            key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
+            key === 'borderContrast' ? undefined : key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
         const fingerprint = createHash('sha256').update(serialized).digest('hex');
         assert.equal(fingerprint, baseline.fingerprint, `Output changed for ${baseline.colors.join(', ')}`);
     }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { stat } from 'node:fs/promises';
 import { ThemeApplication } from './application';
-import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper, PrimaryChoices, SyntaxStyle, syntaxStyles } from './model';
+import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper, PrimaryChoices, SyntaxStyle, syntaxStyles, BorderContrast, borderContrasts } from './model';
 import { Cancelled, runPipeline, runPreviews, runVariant } from './pipeline';
 import { isPrimaryChoice } from './primary';
 import { createPreviewPicker, PreviewPicker } from './preview';
@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         lastError = message;
         if (manual) { void vscode.window.showErrorMessage(`Borrowed Light: ${message}`); }
     };
-    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; syntaxStyle: SyntaxStyle }> => {
+    const read = async (): Promise<{ wallpaper: Wallpaper; path: string; harmony: Harmony; appearance: Appearance; signature: string; sourceSignature: string; primaries: PrimaryChoices; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast }> => {
         // Wait for the latest override probe before manual sync/report/preview reads.
         let pending: Promise<void>;
         do { pending = providerUpdate; await pending; } while (pending !== providerUpdate);
@@ -57,13 +57,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!isPrimaryChoice(primaries.dark) || !isPrimaryChoice(primaries.light)) { throw new Error('Unknown primary color setting'); }
         const syntaxStyle = config.get<SyntaxStyle>('syntaxStyle', 'balanced');
         if (!syntaxStyles.includes(syntaxStyle)) { throw new Error('Unknown syntax style setting'); }
+        const borderContrast = config.get<BorderContrast>('borderContrast', 'balanced');
+        if (!borderContrasts.includes(borderContrast)) { throw new Error('Unknown border contrast setting'); }
         const requested = config.get<string>('appearance', 'dark');
         if (!['dark', 'light', 'desktop'].includes(requested)) { throw new Error('Unknown appearance setting'); }
         const wallpaper = await provider.current();
         const appearance = requested === 'desktop' ? wallpaper.appearance : requested as Appearance;
         const path = wallpaperPath(wallpaper.uri), metadata = await stat(path);
         const sourceSignature = JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino]);
-        return { wallpaper, path, harmony, appearance, primaries, syntaxStyle, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle]) };
+        return { wallpaper, path, harmony, appearance, primaries, syntaxStyle, borderContrast, sourceSignature, signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle, borderContrast]) };
     };
     const sync = async (manual: boolean): Promise<void> => {
         if (disposed || preview || previewOpening || (!manual && (!settings().get<boolean>('autoSync') || !application.ownedThemeActive))) { return; }
@@ -75,7 +77,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const source = await read();
             if (currentRevision !== revision || disposed) { return; }
             if (!manual && source.signature === signature) { return; }
-            const result = await runPipeline(workerPath, source.path, source.harmony, source.appearance, signal, source.primaries[source.appearance], source.syntaxStyle);
+            const result = await runPipeline(workerPath, source.path, source.harmony, source.appearance, signal, source.primaries[source.appearance], source.syntaxStyle, undefined, source.borderContrast);
             if (result.theme.checks.some(check => check.ratio < check.minimum)) { throw new Error('Generated theme failed its contrast checks'); }
             if (currentRevision === revision) { cached = { signature: source.signature, result }; }
             await serialized(async () => {
@@ -119,15 +121,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         let variants: PreviewVariants | undefined;
         const picker = createPreviewPicker({
             application, enqueue: serialized, error: value => error(value, true),
-            generate: (swatches, rule, mode, primary, signal, style) => runVariant(workerPath, swatches, rule, mode, primary, signal, style),
+            generate: (swatches, rule, mode, primary, signal, style, borders) => runVariant(workerPath, swatches, rule, mode, primary, signal, style, borders),
             prepare: async signal => {
                 source = await read();
                 if (signal.aborted) { throw new Cancelled(); }
                 // Selecting a contributed theme does not update our appearance preference.
                 // Keep rule/primary previews in the currently visible mode until explicitly toggled.
                 const appearance = application.active === themeNames.light ? 'light' : application.active === themeNames.dark ? 'dark' : source.appearance;
-                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal, source.primaries, source.syntaxStyle);
-                return { variants, harmony: source.harmony, appearance, primaries: source.primaries, syntaxStyle: source.syntaxStyle };
+                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path }, signal, source.primaries, source.syntaxStyle, undefined, source.borderContrast);
+                return { variants, harmony: source.harmony, appearance, primaries: source.primaries, syntaxStyle: source.syntaxStyle, borderContrast: source.borderContrast };
             },
         });
         preview = picker; previewOpening = false;
@@ -155,7 +157,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             reportWorkers.add(reportAbort);
             try {
                 const source = await read();
-                const result = cached?.signature === source.signature ? cached.result : await runPipeline(workerPath, source.path, source.harmony, source.appearance, reportAbort.signal, source.primaries[source.appearance], source.syntaxStyle);
+                const result = cached?.signature === source.signature ? cached.result : await runPipeline(workerPath, source.path, source.harmony, source.appearance, reportAbort.signal, source.primaries[source.appearance], source.syntaxStyle, undefined, source.borderContrast);
                 if (disposed) { return; }
                 cached = { signature: source.signature, result };
                 const panel = vscode.window.createWebviewPanel('borrowedLightReport', 'Borrowed Light: Palette & Contrast', vscode.ViewColumn.Beside, { enableScripts: false, localResourceRoots: [] });

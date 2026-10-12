@@ -2,7 +2,7 @@ import { HexColorCode } from './code';
 import { fromOklch, toOklch } from './conversion';
 import { contrastRatio, ensureReadableColor } from './contrast';
 import { syntaxColors } from './syntax';
-import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle } from '../model';
+import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle, BorderContrast } from '../model';
 
 // Custom visual policy, expressed in OKLCH units. These values are deliberately kept
 // separate from WCAG constants: they control appearance, not accessibility thresholds.
@@ -30,7 +30,7 @@ const statusColors = {
 
 export const themeNames = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
 export const themeLabels = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
-export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced'): GeneratedTheme {
+export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'balanced'): GeneratedTheme {
     if (palette.length !== surfacePolicy.harmonySize) { throw new Error('Expected five harmony colors'); }
     const primaryCoordinates = toOklch(primary);
     const dark = appearance === 'dark';
@@ -75,7 +75,13 @@ export function generateTheme(palette: HexColorCode[], appearance: Appearance, p
     colors['peekViewEditorGutter.background'] = panelBackground;
     assignColors(['descriptionForeground', 'disabledForeground', 'input.placeholderForeground', 'editorLineNumber.foreground', 'activityBar.inactiveForeground', 'tab.unfocusedActiveForeground', 'tab.unfocusedInactiveForeground', 'peekViewTitleDescription.foreground'], secondaryText);
     assignColors(['textLink.foreground', 'textLink.activeForeground', 'editorCursor.foreground', 'editorLineNumber.activeForeground', 'progressBar.background', 'editorSuggestWidget.highlightForeground'], accent);
-    assignColors(['focusBorder', 'input.border', 'dropdown.border', 'button.border', 'editor.findMatchBorder', 'editorGroup.border', 'panel.border', 'widget.border', 'notifications.border', 'surface.border'], indicator);
+    assignColors(['focusBorder', 'input.border', 'dropdown.border', 'button.border', 'editor.findMatchBorder'], indicator);
+    // Pane separators are decorative. Keep keyboard focus and control outlines at
+    // their existing contrast target while letting the surrounding chrome recede.
+    const border = borderContrast === 'vibrant' ? indicator : assignReadableRole('Pane borders',
+        fromOklch({ lightness: toOklch(panelBackground).lightness, chroma: surfaceChroma, hueDegrees: primaryCoordinates.hueDegrees }),
+        [editorBackground, panelBackground, fieldBackground], borderContrast === 'mellow' ? 1.15 : 1.5);
+    assignColors(['editorGroup.border', 'panel.border', 'widget.border', 'notifications.border', 'surface.border'], border);
     colors['button.background'] = buttonBackground; colors['button.hoverBackground'] = buttonHoverBackground; colors['button.foreground'] = buttonForeground;
     const error = assignReadableRole('Error', fromOklch(statusColors.error));
     const warning = assignReadableRole('Warning', fromOklch(statusColors.warning));

@@ -28,7 +28,7 @@ class Memory implements vscode.Memento {
 const palette = ['#5a8cab', '#d79e63', '#8eb886', '#bd88c7', '#bf7272'].map(parseHexColorCode);
 suite('Borrowed Light extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
-    const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.platformProvider'];
+    const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.borderContrast', 'borrowed-light.platformProvider'];
     let originals: Record<string, unknown>;
     setup(() => {
         originals = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
@@ -179,7 +179,7 @@ suite('Borrowed Light extension host', () => {
             await waitFor('triad');
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
-            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced' });
+            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'balanced' });
             assert.equal(config().get('borrowed-light.harmony'), 'triad');
             assert.equal(config().get('borrowed-light.appearance'), 'dark');
             assert.deepEqual(errors, []);

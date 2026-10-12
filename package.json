@@ -147,6 +147,14 @@
           "scope": "application",
           "description": "Syntax highlighting style. Cycle live using the keyword button in the wallpaper preview."
         },
+        "borrowed-light.borderContrast": {
+          "type": "string",
+          "enum": ["mellow", "balanced", "vibrant"],
+          "enumDescriptions": ["Subtle, muted pane separators.", "Moderate, muted pane separators.", "Strong wallpaper-colored pane outlines."],
+          "default": "balanced",
+          "scope": "application",
+          "description": "Contrast of decorative pane and widget borders. Independent of syntax colors; focus and control outlines retain their visibility. Preview changes are saved only when accepted."
+        },
         "borrowed-light.platformProvider": {
           "type": "string",
           "enum": [

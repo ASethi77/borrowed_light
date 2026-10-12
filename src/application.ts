@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Appearance, GeneratedTheme, Harmony, PrimaryChoices, SyntaxStyle } from './model';
+import { Appearance, GeneratedTheme, Harmony, PrimaryChoices, SyntaxStyle, BorderContrast } from './model';
 import { Ledger, Values, equal, mergeOwned, restoreOwned } from './ownership';
 import { themeNames } from './color/theme';
 
@@ -57,9 +57,9 @@ export class ThemeApplication {
         }
         await this.state.update(previewKey, undefined);
     }
-    async commitPreview(harmony: Harmony, appearance: Appearance, primaries?: PrimaryChoices, syntaxStyle?: SyntaxStyle): Promise<void> {
+    async commitPreview(harmony: Harmony, appearance: Appearance, primaries?: PrimaryChoices, syntaxStyle?: SyntaxStyle, borderContrast?: BorderContrast): Promise<void> {
         try {
-            for (const [key, written] of Object.entries({ 'borrowed-light.harmony': harmony, 'borrowed-light.appearance': appearance, ...(syntaxStyle ? { 'borrowed-light.syntaxStyle': syntaxStyle } : {}), ...(primaries ? { 'borrowed-light.primaryDark': primaries.dark, 'borrowed-light.primaryLight': primaries.light } : {}) })) {
+            for (const [key, written] of Object.entries({ 'borrowed-light.harmony': harmony, 'borrowed-light.appearance': appearance, ...(syntaxStyle ? { 'borrowed-light.syntaxStyle': syntaxStyle } : {}), ...(borderContrast ? { 'borrowed-light.borderContrast': borderContrast } : {}), ...(primaries ? { 'borrowed-light.primaryDark': primaries.dark, 'borrowed-light.primaryLight': primaries.light } : {}) })) {
                 const config = vscode.workspace.getConfiguration();
                 const saved = this.state.get<PreviewJournal>(previewKey);
                 if (!saved) { throw new Error('Preview session is no longer active'); }

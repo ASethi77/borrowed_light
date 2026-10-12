@@ -2,17 +2,17 @@ import { NativeImageDecoder } from './platform/contracts';
 import { nativeImageDecoder } from './platform/os_wallpaper';
 import { maxBytes } from './image/limits';
 import { Worker } from 'node:worker_threads';
-import { Appearance, Harmony, PaletteResult, PipelineInput, PreviewVariants, PrimaryChoice, PrimaryChoices, Swatch, SyntaxStyle } from './model';
+import { Appearance, Harmony, PaletteResult, PipelineInput, PreviewVariants, PrimaryChoice, PrimaryChoices, Swatch, SyntaxStyle, BorderContrast } from './model';
 
 export class Cancelled extends Error { constructor() { super('Generation superseded or stopped'); } }
-export function runPipeline(workerPath: string, path: string, harmony: Harmony, appearance: Appearance, signal?: AbortSignal, primary: PrimaryChoice = 'automatic', syntaxStyle: SyntaxStyle = 'balanced', decoder: NativeImageDecoder | undefined = nativeImageDecoder()): Promise<PaletteResult> {
-    return runWorker<PaletteResult>(workerPath, { path, harmony, appearance, primary, syntaxStyle }, signal, decoder);
+export function runPipeline(workerPath: string, path: string, harmony: Harmony, appearance: Appearance, signal?: AbortSignal, primary: PrimaryChoice = 'automatic', syntaxStyle: SyntaxStyle = 'balanced', decoder: NativeImageDecoder | undefined = nativeImageDecoder(), borderContrast: BorderContrast = 'balanced'): Promise<PaletteResult> {
+    return runWorker<PaletteResult>(workerPath, { path, harmony, appearance, primary, syntaxStyle, borderContrast }, signal, decoder);
 }
-export function runPreviews(workerPath: string, source: Pick<PipelineInput, 'path' | 'swatches'>, signal?: AbortSignal, primaries?: PrimaryChoices, syntaxStyle: SyntaxStyle = 'balanced', decoder: NativeImageDecoder | undefined = nativeImageDecoder()): Promise<PreviewVariants> {
-    return runWorker<PreviewVariants>(workerPath, { ...source, previews: true, primaries, syntaxStyle }, signal, decoder);
+export function runPreviews(workerPath: string, source: Pick<PipelineInput, 'path' | 'swatches'>, signal?: AbortSignal, primaries?: PrimaryChoices, syntaxStyle: SyntaxStyle = 'balanced', decoder: NativeImageDecoder | undefined = nativeImageDecoder(), borderContrast: BorderContrast = 'balanced'): Promise<PreviewVariants> {
+    return runWorker<PreviewVariants>(workerPath, { ...source, previews: true, primaries, syntaxStyle, borderContrast }, signal, decoder);
 }
-export function runVariant(workerPath: string, swatches: Swatch[], harmony: Harmony, appearance: Appearance, primary: PrimaryChoice, signal?: AbortSignal, syntaxStyle: SyntaxStyle = 'balanced'): Promise<PaletteResult> {
-    return runWorker<PaletteResult>(workerPath, { swatches, harmony, appearance, primary, syntaxStyle }, signal);
+export function runVariant(workerPath: string, swatches: Swatch[], harmony: Harmony, appearance: Appearance, primary: PrimaryChoice, signal?: AbortSignal, syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'balanced'): Promise<PaletteResult> {
+    return runWorker<PaletteResult>(workerPath, { swatches, harmony, appearance, primary, syntaxStyle, borderContrast }, signal);
 }
 function runWorker<T>(workerPath: string, input: PipelineInput, signal?: AbortSignal, decoder?: NativeImageDecoder): Promise<T> {
     if (signal?.aborted) { return Promise.reject(new Cancelled()); }

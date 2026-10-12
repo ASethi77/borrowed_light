@@ -6,6 +6,8 @@ export type Harmony = typeof harmonies[number];
 export type Appearance = 'dark' | 'light';
 export const syntaxStyles = ['mellow', 'balanced', 'vibrant', 'vibrant-alt'] as const;
 export type SyntaxStyle = typeof syntaxStyles[number];
+export const borderContrasts = ['mellow', 'balanced', 'vibrant'] as const;
+export type BorderContrast = typeof borderContrasts[number];
 export type PrimaryChoice = 'automatic' | `wallpaper-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}` | `harmony-${1 | 2 | 3 | 4 | 5}`;
 export type PrimaryChoices = Record<Appearance, PrimaryChoice>;
 export interface PrimaryColor { id: PrimaryChoice; hex: HexColorCode; label: string }
@@ -34,7 +36,7 @@ export interface GeneratedTheme {
     roles: Role[];
     checks: ContrastCheck[];
 }
-export interface PaletteResult { swatches: Swatch[]; palette: HexColorCode[]; neutral: boolean; primary: PrimaryColor; syntaxStyle: SyntaxStyle; theme: GeneratedTheme }
+export interface PaletteResult { swatches: Swatch[]; palette: HexColorCode[]; neutral: boolean; primary: PrimaryColor; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast; theme: GeneratedTheme }
 export type PreviewVariants = Record<Harmony, Record<Appearance, PaletteResult>>;
 export interface PipelineInput {
     path?: string;
@@ -46,4 +48,5 @@ export interface PipelineInput {
     primary?: PrimaryChoice;
     primaries?: PrimaryChoices;
     syntaxStyle?: SyntaxStyle;
+    borderContrast?: BorderContrast;
 }
