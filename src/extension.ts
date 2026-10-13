@@ -115,8 +115,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const configureMonitoring = () => {
         stop();
         if (!settings().get<boolean>('autoSync')) { return; }
-        monitor = provider.watch?.(schedule, value => error(value, false));
-        timer = setInterval(schedule, 30000);
+        let monitorFailed = false;
+        monitor = provider.watch?.(schedule, value => {
+            error(value, false);
+            monitorFailed = true;
+            if (timer) { clearInterval(timer); timer = setInterval(schedule, 30000); }
+        });
+        timer = setInterval(schedule, monitor && !monitorFailed ? provider.pollIntervalMs ?? 30000 : 30000);
         schedule();
     };
     const openPreview = async () => {

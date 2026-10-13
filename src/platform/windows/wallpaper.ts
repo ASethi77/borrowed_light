@@ -1,8 +1,9 @@
 import { join } from 'node:path';
-import { WallpaperProvider, Wallpaper } from '../contracts';
+import { WallpaperProvider, Wallpaper, Disposable } from '../contracts';
 import { ProcessRunner, runProcess } from '../process';
 import { wallpaperUri } from '../../image/source';
 import { wallpaperScript } from './scripts';
+import { watchWindowsWallpaper } from './watcher';
 
 /** EncodedCommand contains fixed source only, encoded as required UTF-16LE.
  * Image data is supplied through stdin, never concatenated into the command.
@@ -15,6 +16,7 @@ export function powershellExecutable(): string {
 }
 export class WindowsProvider implements WallpaperProvider {
     readonly id = 'windows';
+    readonly pollIntervalMs = 5 * 60 * 1000;
     constructor(private readonly run: ProcessRunner = runProcess) {}
     async available(): Promise<boolean> {
         try { await this.run(powershellExecutable(), powershellArguments("[Console]::Write('ready')")); return true; }
@@ -24,6 +26,9 @@ export class WindowsProvider implements WallpaperProvider {
         const value: unknown = JSON.parse((await this.run(powershellExecutable(), powershellArguments(wallpaperScript))).toString('utf8'));
         const path = primaryWallpaperPath(value);
         return { uri: wallpaperUri(path), appearance: (value as { appearance: 'light' | 'dark' }).appearance, provider: this.id };
+    }
+    watch(changed: () => void, failed: (error: Error) => void): Disposable {
+        return watchWindowsWallpaper(changed, failed);
     }
 }
 

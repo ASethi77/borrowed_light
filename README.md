@@ -64,7 +64,7 @@ Primary hue tweaks are specific to the wallpaper. Syncing a new image (including
 
 Border contrast is a separate preference, shared between light and dark themes. **Mellow** gives subtle muted separators, **Balanced** gives moderately visible muted separators, and **Vibrant** preserves the original strong wallpaper-colored outlines. Focus indicators and control outlines stay visible. Cycle the border button to preview the change and press Enter to save; Escape or clicking outside restores your earlier borders. The saved choice persists across wallpaper syncs and syntax/color-rule changes. The default remains Vibrant until you choose another setting.
 
-Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds. Windows checks every 30 seconds; GNOME also listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
+Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. Windows listens for desktop/theme registry changes and watches the wallpaper cache, with a five-minute safety check for missed changes. If its event monitor fails, it falls back to 30-second checks. It uses built-in Windows PowerShell; no extra installation is needed. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds; GNOME listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
 
 ## Demos
 

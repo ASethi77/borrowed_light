@@ -72,6 +72,64 @@ $appearance = if ($null -ne $theme -and $theme.SystemUsesLightTheme -eq 0) { 'da
 } catch { [Console]::Error.WriteLine($_.Exception.GetBaseException().Message); exit 1 }
 `;
 
+/** RegNotifyChangeKeyValue is one-shot: rearm before emitting each notification.
+ * Waiting on events costs no polling work. Stdin EOF ends the helper if its owner exits.
+ * https://learn.microsoft.com/windows/win32/api/winreg/nf-winreg-regnotifychangekeyvalue
+ */
+export const wallpaperWatchScript = String.raw`
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+try {
+Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
+namespace BorrowedLight {
+    public static class RegistryMonitor {
+        [DllImport("advapi32.dll")]
+        static extern int RegNotifyChangeKeyValue(SafeRegistryHandle key, bool subtree,
+            uint filter, SafeWaitHandle signal, bool asynchronous);
+        static void Arm(RegistryKey key, EventWaitHandle signal) {
+            // Watch subtree names and value changes, independent of issuing thread lifetime.
+            int result = RegNotifyChangeKeyValue(key.Handle, true, 0x10000005, signal.SafeWaitHandle, true);
+            if (result != 0) throw new Win32Exception(result);
+        }
+        public static void Run() {
+            using (var desktop = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
+            using (var themes = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes"))
+            using (var desktopEvent = new AutoResetEvent(false))
+            using (var themeEvent = new AutoResetEvent(false))
+            using (var stopped = new ManualResetEvent(false)) {
+                if (desktop == null || themes == null) throw new Exception("Windows wallpaper registry keys are unavailable");
+                var reader = new Thread(() => {
+                    try { var input = Console.OpenStandardInput(); while (input.ReadByte() != -1) { } }
+                    finally { stopped.Set(); }
+                });
+                reader.IsBackground = true;
+                reader.Start();
+                Arm(desktop, desktopEvent); Arm(themes, themeEvent);
+                Console.WriteLine("ready"); Console.Out.Flush();
+                var events = new WaitHandle[] { stopped, desktopEvent, themeEvent };
+                while (true) {
+                    int index = WaitHandle.WaitAny(events);
+                    if (index == 0) return;
+                    if (index == 1) Arm(desktop, desktopEvent);
+                    else Arm(themes, themeEvent);
+                    Console.WriteLine("changed"); Console.Out.Flush();
+                }
+            }
+        }
+    }
+}
+'@
+[BorrowedLight.RegistryMonitor]::Run()
+} catch { [Console]::Error.WriteLine($_.Exception.GetBaseException().Message); exit 1 }
+`;
+
 /** WPF's on-demand WIC decoder exposes dimensions before CopyPixels/PNG encoding.
  * Consume source bytes on stdin; write ONLY PNG bytes on stdout (no path interpolation).
  * https://learn.microsoft.com/dotnet/api/system.windows.media.imaging.bitmapdecoder.create
