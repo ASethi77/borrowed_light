@@ -4,6 +4,7 @@
  */
 export const desktopInteropScript = String.raw`
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Add-Type -TypeDefinition @'
 using System;
@@ -18,7 +19,7 @@ namespace BorrowedLight {
         [return: MarshalAs(UnmanagedType.LPWStr)] string GetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string monitor);
         [return: MarshalAs(UnmanagedType.LPWStr)] string GetMonitorDevicePathAt(uint index);
         uint GetMonitorDevicePathCount();
-        Rectangle GetMonitorRECT([MarshalAs(UnmanagedType.LPWStr)] string monitor);
+        [PreserveSig] int GetMonitorRECT([MarshalAs(UnmanagedType.LPWStr)] string monitor, out Rectangle rectangle);
     }
     public class MonitorWallpaper { public Rectangle Bounds; public string Path; }
     public class WallpaperSnapshot { public Rectangle Primary; public MonitorWallpaper[] Monitors; }
@@ -39,24 +40,36 @@ namespace BorrowedLight {
             if (!GetMonitorInfo(MonitorFromPoint(new Point(), 1), ref primary)) throw new Exception("Cannot identify primary display");
             var desktop = (IDesktopWallpaper)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD")));
             try {
-                var monitors = new System.Collections.Generic.List<MonitorWallpaper>();
-                for (uint index = 0; index < desktop.GetMonitorDevicePathCount(); index++) {
-                    string monitor = desktop.GetMonitorDevicePathAt(index);
-                    Rectangle rectangle = desktop.GetMonitorRECT(monitor);
-                    monitors.Add(new MonitorWallpaper { Bounds = rectangle, Path = desktop.GetWallpaper(monitor) });
-                }
-                return new WallpaperSnapshot { Primary = primary.Monitor, Monitors = monitors.ToArray() };
+                return Collect(desktop, primary.Monitor);
             } finally { Marshal.FinalReleaseComObject(desktop); }
+        }
+        public static WallpaperSnapshot Collect(IDesktopWallpaper desktop, Rectangle primary) {
+            var monitors = new System.Collections.Generic.List<MonitorWallpaper>();
+            for (uint index = 0; index < desktop.GetMonitorDevicePathCount(); index++) {
+                string monitor = desktop.GetMonitorDevicePathAt(index);
+                Rectangle rectangle;
+                // Enumeration includes detached/stale displays. S_FALSE and failures
+                // have no usable rectangle and must not abort the primary lookup.
+                if (desktop.GetMonitorRECT(monitor, out rectangle) != 0) continue;
+                if (rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top) continue;
+                if (rectangle.Left != primary.Left || rectangle.Top != primary.Top ||
+                    rectangle.Right != primary.Right || rectangle.Bottom != primary.Bottom) continue;
+                monitors.Add(new MonitorWallpaper { Bounds = rectangle, Path = desktop.GetWallpaper(monitor) });
+                break;
+            }
+            return new WallpaperSnapshot { Primary = primary, Monitors = monitors.ToArray() };
         }
     }
 }
 '@
 `;
 export const wallpaperScript = String.raw`${desktopInteropScript}
+try {
 $snapshot = [BorrowedLight.Desktop]::Snapshot()
 $theme = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -ErrorAction SilentlyContinue
 $appearance = if ($null -ne $theme -and $theme.SystemUsesLightTheme -eq 0) { 'dark' } else { 'light' }
 [Console]::WriteLine((@{ primary = $snapshot.Primary; monitors = @($snapshot.Monitors | ForEach-Object { @{ bounds = $_.Bounds; path = $_.Path } }); appearance = $appearance } | ConvertTo-Json -Depth 6 -Compress))
+} catch { [Console]::Error.WriteLine($_.Exception.GetBaseException().Message); exit 1 }
 `;
 
 /** WPF's on-demand WIC decoder exposes dimensions before CopyPixels/PNG encoding.
@@ -65,6 +78,7 @@ $appearance = if ($null -ne $theme -and $theme.SystemUsesLightTheme -eq 0) { 'da
  */
 export const imageScript = String.raw`
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 try {
     Add-Type -AssemblyName PresentationCore, WindowsBase
     $inputStream = [Console]::OpenStandardInput()
@@ -75,6 +89,11 @@ try {
     $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create($source, [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnDemand)
     $frame = $decoder.Frames[0]
     if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or [long]$frame.PixelWidth * $frame.PixelHeight -gt 32000000) { throw 'Wallpaper exceeds the 32 megapixel limit' }
+    $scale = 1024.0 / [Math]::Max($frame.PixelWidth, $frame.PixelHeight)
+    if ($scale -lt 1) {
+        $transform = New-Object System.Windows.Media.ScaleTransform($scale, $scale)
+        $frame = New-Object System.Windows.Media.Imaging.TransformedBitmap($frame, $transform)
+    }
     $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
     $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($frame))
     $output = New-Object System.IO.MemoryStream

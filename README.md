@@ -18,10 +18,10 @@ https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
 | Other Linux distributions | GNOME | Uses the same provider; not yet validated |
 | Linux | KDE Plasma | Not yet supported |
 | Linux | Xfce, Cinnamon, MATE, and other desktops | Not yet supported |
-| Windows | Windows desktop | Implemented; native desktop validation pending |
+| Windows | Windows desktop | Validated with native wallpaper discovery and light/dark theme generation |
 | macOS | macOS desktop | Validated on a MacBook with Sequoia Sunrise; other macOS versions pending |
 
-Use VS Code **1.128 or later** with a local wallpaper. Portable decoding on Windows/Linux supports up to **64 MiB / 32 megapixels**. macOS normalizes local images to thumbnails up to 1024 pixels on the longest edge before palette extraction, so large built-in wallpapers do not hit those source limits. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
+Use VS Code **1.128 or later** with a local wallpaper. Windows/Linux source images support up to **64 MiB / 32 megapixels**. Windows and macOS normalize local images to thumbnails up to 1024 pixels on the longest edge before palette extraction to bound worker memory use. macOS can also normalize larger built-in source wallpapers. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
 
 On modern macOS, selected image and aerial wallpapers are resolved from the local wallpaper store. Aerial wallpapers use Apple’s locally cached preview image; their palette represents that preview rather than the exact live frame. If the preview is missing, open Wallpaper settings to download it and retry. The store format is undocumented and can change between macOS releases.
 

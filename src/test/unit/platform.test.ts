@@ -172,6 +172,50 @@ test('native discovery helper compiles without requiring a configured desktop', 
     assert.equal(output.toString('utf8').trim(), 'ready');
 });
 
+test('Windows COM discovery skips detached, failing and non-primary displays', { skip: process.platform !== 'win32' }, async () => {
+    const fake = `public class FakeDesktop : IDesktopWallpaper {
+        public void SetWallpaper(string monitor, string wallpaper) { }
+        public string GetWallpaper(string monitor) {
+            if (monitor != "3") throw new Exception("Queried non-primary wallpaper");
+            return "primary.png";
+        }
+        public string GetMonitorDevicePathAt(uint index) { return index.ToString(); }
+        public uint GetMonitorDevicePathCount() { return 5; }
+        public int GetMonitorRECT(string monitor, out Rectangle rectangle) {
+            rectangle = new Rectangle { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
+            if (monitor == "0") return 1; // S_FALSE, even with misleading bounds
+            if (monitor == "1") return unchecked((int)0x80004005); // observed E_FAIL
+            if (monitor == "2") rectangle.Left = -1920;
+            if (monitor == "4") throw new Exception("Continued past primary");
+            return 0;
+        }
+    }
+    public static class Desktop`;
+    const script = desktopInteropScript.replace('public static class Desktop', fake) + `
+        $primary = New-Object BorrowedLight.Rectangle
+        $primary.Right = 1920; $primary.Bottom = 1080
+        $snapshot = [BorrowedLight.Desktop]::Collect((New-Object BorrowedLight.FakeDesktop), $primary)
+        [Console]::Write(($snapshot | ConvertTo-Json -Depth 6 -Compress))`;
+    const snapshot = JSON.parse((await runProcess(powershellExecutable(), powershellArguments(script))).toString('utf8'));
+    assert.equal(snapshot.Monitors.length, 1);
+    assert.equal(snapshot.Monitors[0].Path, 'primary.png');
+});
+
+test('Windows file decoding bounds large JPEG thumbnails before the palette worker', { skip: process.platform !== 'win32' }, async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-thumbnail-'));
+    const path = join(directory, 'wallpaper é #.jpg');
+    try {
+        const jpeg = await import('jpeg-js');
+        const data = Buffer.alloc(2048 * 1024 * 4);
+        for (let offset = 0; offset < data.length; offset += 4) { data.set([34, 153, 68, 255], offset); }
+        await writeFile(path, jpeg.encode({ data, width: 2048, height: 1024 }, 80).data);
+        const pixels = decodePixels(await windowsImageDecoder().fromFile!(path, new AbortController().signal));
+        assert.equal(pixels.width, 1024);
+        assert.equal(pixels.height, 512);
+        for (const [channel, expected] of [34, 153, 68, 255].entries()) { assert.ok(Math.abs(pixels.data[channel] - expected) <= 5); }
+    } finally { await fs.promises.rm(directory, { recursive: true, force: true }); }
+});
+
 test('macOS reads the desktop appearance preference rather than the helper app appearance', () => {
     for (const [preference, expected] of [['Dark', 'dark'], [undefined, 'light']]) {
         const context = {
