@@ -27,13 +27,13 @@ test('768 vibrant-border variants retain their complete pre-refactor outputs', (
             for (const appearance of ['dark', 'light'] as const) {
                 for (const syntaxStyle of syntaxStyles) {
                     for (const primary of ['automatic', 'wallpaper-2', 'harmony-5', 'wallpaper-8'] as const) {
-                        variants.push(generateVariant(swatches, harmony, appearance, primary, syntaxStyle, 'vibrant'));
+                        variants.push(generateVariant(swatches, harmony, appearance, primary, syntaxStyle, 'vibrant', 'colorful'));
                     }
                 }
             }
         }
         const serialized = JSON.stringify(variants, (key, value: unknown) =>
-            key === 'borderContrast' ? undefined : key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
+            (key === 'borderContrast' || key === 'backgroundTint') ? undefined : key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
         const fingerprint = createHash('sha256').update(serialized).digest('hex');
         assert.equal(fingerprint, baseline.fingerprint, `Output changed for ${baseline.colors.join(', ')}`);
     }
@@ -47,4 +47,18 @@ test('extraction retains opacity, centroid and sampled-grid baselines', () => {
     ];
     const expected = [[{"hex": "#7f7f7f", "weight": 0.3996865203761755}, {"hex": "#ff0000", "weight": 0.3996865203761755}, {"hex": "#00ff00", "weight": 0.2006269592476489}], [{"hex": "#373737", "weight": 1}], [{"hex": "#d41d66", "weight": 0.24999999999999997}, {"hex": "#5099e2", "weight": 0.21919999999999998}, {"hex": "#246db6", "weight": 0.12497777777777776}, {"hex": "#a4ed36", "weight": 0.12497777777777776}, {"hex": "#4d9636", "weight": 0.09333333333333332}, {"hex": "#bb864d", "weight": 0.06253333333333333}, {"hex": "#0c559e", "weight": 0.06248888888888888}, {"hex": "#8cd51e", "weight": 0.06248888888888888}]];
     assert.deepEqual(images.map(image => extractRepresentativeColors(image.data, image.width, image.height)), expected);
+});
+
+// Intentional new light-surface policy: colorful blue/green sources stay quiet while
+// vibrant syntax retains the source palette. The existing 768 baselines cover legacy tint.
+test('subtle light defaults retain blue, green and grayscale visual baselines', () => {
+    for (const [hex, expected] of [
+        ['#0088ff', '4ed21034be71c57feabdd365c9422c306a243bce88f30f7e0d3356c404be86e7'],
+        ['#00cc66', 'ffa4faa4b1fdd6288d7a3682fdc42976e60cc0af8e49b7ae9527d6917d7e1dd3'],
+        ['#888888', 'd16ea103c9dc08686e04a3622e369a251a435edd7e18d554f4a9db5b8ce3cf8a'],
+    ]) {
+        const result = generateVariant([{ hex: parseHexColorCode(hex), weight: 1 }], 'analogous', 'light', 'automatic', 'vibrant');
+        const serialized = JSON.stringify(result, (key, value: unknown) => key === 'ratio' && typeof value === 'number' ? Number(value.toFixed(10)) : value);
+        assert.equal(createHash('sha256').update(serialized).digest('hex'), expected, `Subtle light output changed for ${hex}`);
+    }
 });

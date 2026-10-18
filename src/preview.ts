@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ThemeApplication } from './application';
-import { Appearance, harmonies, Harmony, PreviewVariants, PrimaryChoices, PaletteResult, PrimaryChoice, Swatch, SyntaxStyle, syntaxStyles, BorderContrast, borderContrasts } from './model';
+import { Appearance, harmonies, Harmony, PreviewVariants, PrimaryChoices, PaletteResult, PrimaryChoice, Swatch, SyntaxStyle, syntaxStyles, BorderContrast, borderContrasts, BackgroundTint } from './model';
 import { primaryColors, resolvePrimary } from './primary';
 import { generateVariant } from './variants';
 import { Cancelled } from './pipeline';
@@ -11,7 +11,7 @@ interface PreviewOptions {
     application: ThemeApplication;
     prepare(signal: AbortSignal): Promise<PreviewChoice & { variants: PreviewVariants }>;
     enqueue(action: () => Promise<void>): Promise<void>;
-    generate?(swatches: Swatch[], harmony: Harmony, appearance: Appearance, primary: PrimaryChoice, signal: AbortSignal, syntaxStyle: SyntaxStyle, borderContrast: BorderContrast): Promise<PaletteResult>;
+    generate?(swatches: Swatch[], harmony: Harmony, appearance: Appearance, primary: PrimaryChoice, signal: AbortSignal, syntaxStyle: SyntaxStyle, borderContrast: BorderContrast, backgroundTint: BackgroundTint): Promise<PaletteResult>;
     error(error: unknown): void;
 }
 interface RuleItem extends vscode.QuickPickItem { rule: Harmony }
@@ -66,7 +66,7 @@ export function createPreviewPicker(options: PreviewOptions): PreviewPicker {
             if (current !== revision || finishing === 'cancel') { return; }
             let result = cache.get(key);
             if (!result) {
-                result = options.generate ? await options.generate(base.swatches, rule, mode, primary, signal, style, borders) : generateVariant(base.swatches, rule, mode, primary, style, borders);
+                result = options.generate ? await options.generate(base.swatches, rule, mode, primary, signal, style, borders, base.backgroundTint) : generateVariant(base.swatches, rule, mode, primary, style, borders, base.backgroundTint);
                 cache.set(key, result);
             }
             if (current !== revision) { return; }

@@ -67,3 +67,10 @@ test('GNOME monitoring dispatches notifications and stops all children on dispos
         assert.equal(changed, 2); assert.equal(failed, 1);
     } finally { replacement.mock.restore(); }
 });
+
+test('GNOME can read appearance without resolving either wallpaper key', async () => {
+    const calls: string[][] = [];
+    const provider = new GnomeProvider(async args => { calls.push(args); return "'prefer-dark'"; });
+    assert.equal(await provider.appearance(), 'dark');
+    assert.deepEqual(calls, [['get', 'org.gnome.desktop.interface', 'color-scheme']]);
+});

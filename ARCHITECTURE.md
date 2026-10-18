@@ -34,9 +34,9 @@ flowchart LR
     F --> G[Journal and apply VS Code settings]
 ```
 
-Manual Sync discovers the configured wallpaper, generates the selected appearance, checks its contrast targets, and applies it. Automatic sync requires `borrowed-light.autoSync` and a selected Borrowed Light theme. Choosing another theme prevents automatic application.
+Manual Sync discovers the configured wallpaper, generates the selected appearance, checks its contrast targets, and applies it. Automatic updates require a selected Borrowed Light theme and at least one enabled source: `borrowed-light.autoSync` for wallpaper changes, or `appearance: desktop` for system mode. Appearance-only updates use the persisted palette without reopening the wallpaper. Choosing another theme prevents automatic application.
 
-The GNOME provider watches wallpaper settings and desktop appearance changes. macOS watches its wallpaper store directory and polls wallpaper/appearance every five seconds. Windows uses registry notifications and recursive wallpaper-cache watching, with a five-minute safety check. A failed Windows monitor falls back to 30-second checks; the other providers retain their existing 30-second safety timer. These checks catch missed events and source file replacement at the same path. Notifications are debounced for 500 ms. A signature combines the wallpaper URI, file size/timestamps/inode, harmony, appearance, primary choices, syntax style, and border contrast; unchanged automatic requests skip regeneration.
+The GNOME provider watches wallpaper settings and desktop appearance changes. macOS watches its wallpaper store directory and polls wallpaper/appearance every five seconds. Windows uses registry notifications and recursive wallpaper-cache watching, with a five-minute safety check. A failed Windows monitor falls back to 30-second checks; the other providers retain their existing 30-second safety timer. These checks catch missed events and source file replacement at the same path. Notifications are debounced for 500 ms. A signature combines the wallpaper URI, file size/timestamps/inode, harmony, appearance, primary choices, syntax style, border contrast, and active background tint; unchanged automatic requests skip regeneration.
 
 New requests cancel superseded workers. Revision checks prevent stale results from being applied, and configuration writes run through a serial queue. Failures retain the last applied theme; a partially failed application attempts rollback.
 
@@ -63,7 +63,9 @@ All preferences are application-scoped under `borrowed-light.*`.
 | `syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
 | `borderContrast` | `vibrant` | `mellow`, `balanced`, `vibrant`; independent decorative pane contrast |
 | `platformProvider` | `auto` | `auto`, `windows`, `macos`, `linux-gnome`; overrides must match the host OS |
-| `autoSync` | `false` | Boolean; enables notifications and periodic checks |
+| `autoSync` | `true` | Wallpaper following; migration preserves the previous effective value for existing installations |
+| `backgroundTintLight` | `subtle` | `subtle`, `balanced`, `colorful`; light surface saturation |
+| `backgroundTintDark` | `colorful` | Same options; default retains original dark styling |
 
 ## Platform boundary
 
@@ -167,3 +169,11 @@ See [Developing](DEVELOPING.md) for build and test workflows, or return to the [
 Decorative pane/widget borders have an independent `borderContrast` preference. Mellow and Balanced use muted surface hues with custom minimum contrast targets of 1.15:1 and 1.5:1 against editor, panel, and field surfaces. Vibrant preserves the original indicator color. Keyboard focus, search matches, and control outlines keep the existing indicator contrast policy. Border preference is included in pipeline inputs, preview caches, signatures, and the report; only accepting a preview writes its new setting.
 
 Preview light/dark appearance is transient: committing a preview never writes the appearance preference. The desktop-following command freezes the active editor appearance when following is turned off. `WallpaperPrimaries` persists the last successfully used source signature separately from appearance/syntax; a changed source uses automatic primaries, and a successful sync resets both primary settings. Accepted previews bind their hue choices to the source they sampled. Failed syncs and cancelled previews do not advance the binding. Existing unbound preferences migrate on the first successful sync.
+
+## Independent synchronization and onboarding
+
+Providers expose `appearance()` separately from wallpaper discovery. Monitoring runs when either wallpaper following or system appearance following is enabled. Appearance-only updates regenerate from locally persisted swatches and never stat/decode the current wallpaper. Successful manual syncs and accepted previews refresh that snapshot. Automatic writes remain gated by the active Borrowed Light theme and the existing cancellation/ownership mechanisms.
+
+A versioned installation marker distinguishes first setup from later activation; existing state or explicit preferences suppress automatic theme selection and onboarding. Migration retains the old effective wallpaper sync default. Explicit visual setting changes can regenerate the frozen palette even when both automatic sources are disabled. The welcome page uses a script-free webview with allowlisted commands and reports actual setup success/failure.
+
+Light and dark tint settings are independent. Light defaults to subtle (surface chroma capped at 0.018 after scaling); dark defaults to colorful, preserving prior output. Colorful uses the original surface policy. Tint does not modify the swatches supplied to syntax palette generation.

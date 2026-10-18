@@ -37,7 +37,7 @@ test('detection distinguishes OS and desktop identities, precedence and UNKNOWN'
     assert.deepEqual(detectPlatform('freebsd', {}), { os: 'UNKNOWN', desktop: 'UNKNOWN', rawPlatform: 'freebsd', rawDesktop: '' });
 });
 test('registry routes supported OSes and valid overrides without invoking incompatible helpers', async () => {
-    const registry = providerRegistry.map(entry => ({ ...entry, create: () => ({ id: entry.id, available: async () => true, current: async () => ({ uri: wallpaperUri(path), appearance: 'light' as const, provider: entry.id }) }) }));
+    const registry = providerRegistry.map(entry => ({ ...entry, create: () => ({ id: entry.id, available: async () => true, appearance: async () => 'light' as const, current: async () => ({ uri: wallpaperUri(path), appearance: 'light' as const, provider: entry.id }) }) }));
     for (const [os, desktop, expected] of [['win32', '', 'windows'], ['darwin', '', 'macos'], ['linux', 'GNOME', 'linux-gnome']] as const) {
         assert.equal((await selectProvider(detectPlatform(os, { XDG_CURRENT_DESKTOP: desktop }), 'auto', registry)).id, expected);
     }
@@ -246,4 +246,26 @@ test('macOS watches store replacement, polls appearance, and stops notifications
         monitor.dispose(); assert.ok(watcher.closed);
         notify(); context.mock.timers.tick(10000); assert.equal(changed, 2);
     } finally { context.mock.timers.reset(); replacement.mock.restore(); }
+});
+
+test('appearance-only queries do not request wallpaper paths or image metadata', async () => {
+    const windowsCalls: string[] = [], macosCalls: string[] = [];
+    const windows = new WindowsProvider(async (_executable, args) => {
+        windowsCalls.push(Buffer.from(args.at(-1)!, 'base64').toString('utf16le'));
+        return Buffer.from('dark');
+    });
+    const macos = new MacosProvider(async (_executable, args) => { macosCalls.push(args.at(-1)!); return Buffer.from('light'); });
+    assert.equal(await windows.appearance(), 'dark');
+    assert.equal(await macos.appearance(), 'light');
+    assert.ok(windowsCalls[0].includes('SystemUsesLightTheme'));
+    assert.ok(!windowsCalls[0].includes('GetWallpaper'));
+    assert.ok(macosCalls[0].includes('AppleInterfaceStyle'));
+    assert.ok(!macosCalls[0].includes('desktopImageURL'));
+    await assert.rejects(new WindowsProvider(async () => Buffer.from('invalid')).appearance(), /Invalid/);
+    await assert.rejects(new MacosProvider(async () => Buffer.from('invalid')).appearance(), /Invalid/);
+});
+
+test('native appearance helper runs without wallpaper discovery', { skip: !['win32', 'darwin'].includes(process.platform) }, async () => {
+    const provider = process.platform === 'win32' ? new WindowsProvider() : new MacosProvider();
+    assert.ok(['light', 'dark'].includes(await provider.appearance()));
 });

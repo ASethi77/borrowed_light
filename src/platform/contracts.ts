@@ -6,6 +6,8 @@ export interface WallpaperProvider {
     readonly id: string;
     available(): Promise<boolean>;
     current(): Promise<Wallpaper>;
+    /** Read system mode without resolving or opening the wallpaper. */
+    appearance(): Promise<Appearance>;
     watch?(changed: () => void, failed: (error: Error) => void): Disposable;
     /** Safety checks when an event monitor is healthy; failures use the default interval. */
     readonly pollIntervalMs?: number;

@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { WallpaperProvider, Wallpaper, Disposable } from '../contracts';
 import { ProcessRunner, runProcess } from '../process';
 import { wallpaperUri } from '../../image/source';
-import { wallpaperScript } from './scripts';
+import { wallpaperScript, appearanceScript } from './scripts';
 import { watchWindowsWallpaper } from './watcher';
 
 /** EncodedCommand contains fixed source only, encoded as required UTF-16LE.
@@ -21,6 +21,11 @@ export class WindowsProvider implements WallpaperProvider {
     async available(): Promise<boolean> {
         try { await this.run(powershellExecutable(), powershellArguments("[Console]::Write('ready')")); return true; }
         catch { return false; }
+    }
+    async appearance(): Promise<'light' | 'dark'> {
+        const appearance = (await this.run(powershellExecutable(), powershellArguments(appearanceScript))).toString('utf8').trim();
+        if (appearance !== 'light' && appearance !== 'dark') { throw new Error('Invalid system appearance response'); }
+        return appearance;
     }
     async current(): Promise<Wallpaper> {
         const value: unknown = JSON.parse((await this.run(powershellExecutable(), powershellArguments(wallpaperScript))).toString('utf8'));

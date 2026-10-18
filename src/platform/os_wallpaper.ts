@@ -14,6 +14,7 @@ export class UnsupportedProvider implements WallpaperProvider {
     constructor(private readonly reason: string) {}
     async available(): Promise<boolean> { return true; }
     async current(): Promise<Wallpaper> { throw new Error(this.reason); }
+    async appearance(): Promise<'light' | 'dark'> { throw new Error(this.reason); }
 }
 export interface ProviderRegistration {
     id: Exclude<ProviderChoice, 'auto'>;

@@ -12,8 +12,11 @@ export class GnomeProvider implements WallpaperProvider {
             return ['org.gnome.desktop.background', 'org.gnome.desktop.interface'].every(s => schemas.includes(s));
         } catch { return false; }
     }
+    async appearance(): Promise<'light' | 'dark'> {
+        return parseGvariant(await this.run(['get', 'org.gnome.desktop.interface', 'color-scheme'])) === 'prefer-dark' ? 'dark' : 'light';
+    }
     async current(): Promise<Wallpaper> {
-        const appearance = parseGvariant(await this.run(['get', 'org.gnome.desktop.interface', 'color-scheme'])) === 'prefer-dark' ? 'dark' : 'light';
+        const appearance = await this.appearance();
         let uri = '';
         if (appearance === 'dark') {
             try { uri = parseGvariant(await this.run(['get', 'org.gnome.desktop.background', 'picture-uri-dark'])); } catch { /* Older GNOME has no dark key. */ }

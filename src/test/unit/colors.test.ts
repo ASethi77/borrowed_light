@@ -202,3 +202,23 @@ test('border contrast changes pane separators independently of syntax, surfaces 
         assert.notDeepEqual(syntaxChange.theme.textMateRules, variants[0].theme.textMateRules);
     }
 });
+
+test('light tint is subdued while default dark styling matches the original colorful policy', () => {
+    for (const hex of ['#0088ff', '#00cc66', '#cc3344', '#888888']) {
+        const swatches = [{ hex: parseHexColorCode(hex), weight: 1 }];
+        const light = generateVariant(swatches, 'triad', 'light');
+        for (const surface of ['editor.background', 'statusBar.background', 'input.background', 'list.hoverBackground']) {
+            assert.ok(toOklch(light.theme.colors[surface]).chroma < 0.021, `${hex}/${surface}`);
+        }
+        const dark = generateVariant(swatches, 'triad', 'dark');
+        const original = generateVariant(swatches, 'triad', 'dark', 'automatic', 'balanced', 'vibrant', 'colorful');
+        assert.deepEqual(dark, original);
+        for (const tint of ['subtle', 'balanced', 'colorful'] as const) {
+            for (const appearance of ['light', 'dark'] as const) {
+                const result = generateVariant(swatches, 'triad', appearance, 'automatic', 'vibrant', 'vibrant', tint);
+                result.theme.checks.forEach(check => assert.ok(check.ratio >= check.minimum));
+                assert.deepEqual(result.swatches, swatches);
+            }
+        }
+    }
+});

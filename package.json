@@ -43,6 +43,10 @@
       {
         "command": "borrowed-light.toggleDesktopAppearance",
         "title": "Borrowed Light: Toggle Following Desktop Light/Dark Appearance"
+      },
+      {
+        "command": "borrowed-light.welcome",
+        "title": "Borrowed Light: Show Welcome"
       }
     ],
     "themes": [
@@ -89,9 +93,9 @@
         },
         "borrowed-light.autoSync": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "scope": "application",
-          "description": "Monitor wallpaper changes while a Borrowed Light theme is selected. Sync manually first to select it."
+          "description": "Follow wallpaper changes while a Borrowed Light theme is selected. Independent of system appearance following."
         },
         "borrowed-light.primaryDark": {
           "type": "string",
@@ -157,8 +161,16 @@
         },
         "borrowed-light.borderContrast": {
           "type": "string",
-          "enum": ["mellow", "balanced", "vibrant"],
-          "enumDescriptions": ["Subtle, muted pane separators.", "Moderate, muted pane separators.", "Strong wallpaper-colored pane outlines."],
+          "enum": [
+            "mellow",
+            "balanced",
+            "vibrant"
+          ],
+          "enumDescriptions": [
+            "Subtle, muted pane separators.",
+            "Moderate, muted pane separators.",
+            "Strong wallpaper-colored pane outlines."
+          ],
           "default": "vibrant",
           "scope": "application",
           "description": "Contrast of decorative pane and widget borders. Independent of syntax colors; focus and control outlines retain their visibility. Preview changes are saved only when accepted."
@@ -174,6 +186,28 @@
           "default": "auto",
           "scope": "application",
           "description": "Wallpaper provider. Auto detects the local OS and Linux desktop. Override for ambiguous Linux sessions; providers must match the host OS."
+        },
+        "borrowed-light.backgroundTintLight": {
+          "type": "string",
+          "enum": [
+            "subtle",
+            "balanced",
+            "colorful"
+          ],
+          "default": "subtle",
+          "scope": "application",
+          "description": "Light-theme background surface saturation, independently of wallpaper hue, syntax colors, and border contrast."
+        },
+        "borrowed-light.backgroundTintDark": {
+          "type": "string",
+          "enum": [
+            "subtle",
+            "balanced",
+            "colorful"
+          ],
+          "default": "colorful",
+          "scope": "application",
+          "description": "Dark-theme background surface saturation. Colorful preserves the original dark styling; light-theme tint and syntax colors are independent."
         }
       }
     },

@@ -18,7 +18,7 @@ suite('Native desktop wallpaper smoke test', () => {
         assert.ok((await stat(wallpaperPath(wallpaper.uri))).isFile());
         assert.ok(['light', 'dark'].includes(wallpaper.appearance));
         const config = () => vscode.workspace.getConfiguration();
-        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.platformProvider', 'borrowed-light.borderContrast', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight'];
+        const keys = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.backgroundTintLight', 'borrowed-light.backgroundTintDark', 'borrowed-light.platformProvider', 'borrowed-light.borderContrast', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight'];
         const originals = Object.fromEntries(keys.map(key => [key, config().inspect(key)?.globalValue]));
         try {
             // Force automatic selection for this test, then restore the user's preference.

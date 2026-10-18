@@ -2,7 +2,7 @@ import { HexColorCode } from './code';
 import { fromOklch, toOklch } from './conversion';
 import { contrastRatio, ensureReadableColor } from './contrast';
 import { syntaxColors } from './syntax';
-import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle, BorderContrast } from '../model';
+import { Appearance, balancedPolicy, ContrastPolicy, GeneratedTheme, Role, Swatch, TextMateRule, SyntaxStyle, BorderContrast, BackgroundTint } from '../model';
 
 // Custom visual policy, expressed in OKLCH units. These values are deliberately kept
 // separate from WCAG constants: they control appearance, not accessibility thresholds.
@@ -30,7 +30,7 @@ const statusColors = {
 
 export const themeNames = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
 export const themeLabels = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
-export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'vibrant'): GeneratedTheme {
+export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'vibrant', backgroundTint: BackgroundTint = appearance === 'dark' ? 'colorful' : 'subtle'): GeneratedTheme {
     if (palette.length !== surfacePolicy.harmonySize) { throw new Error('Expected five harmony colors'); }
     const primaryCoordinates = toOklch(primary);
     const dark = appearance === 'dark';
@@ -41,12 +41,18 @@ export function generateTheme(palette: HexColorCode[], appearance: Appearance, p
     // Near-white, fixed surfaces erased wallpaper differences. Use its brightness and colorfulness
     // for light surfaces, leaving enough lightness headroom for perceptible, in-gamut hue variation.
     const baseLightness = surfacePolicy.light.baseLightness + surfacePolicy.light.wallpaperLightnessScale * sourceLightness;
-    const surfaceChroma = dark ? Math.min(primaryCoordinates.chroma, surfacePolicy.dark.maximumTintChroma) : Math.min(primaryCoordinates.chroma * surfacePolicy.light.primaryChromaScale, surfacePolicy.light.baseChroma + sourceChroma * surfacePolicy.light.wallpaperChromaScale);
+    // Surface saturation is independent of the original swatches used by syntaxColors.
+    // Cap AFTER panel/field scaling, so bright blue/green wallpapers stay quiet throughout.
+    const tintStrength = { subtle: 0.2, balanced: 0.5, colorful: 1 }[backgroundTint];
+    const tintCap = backgroundTint === 'subtle' ? (dark ? 0.010 : 0.018) : backgroundTint === 'balanced' ? (dark ? 0.014 : 0.040) : Infinity;
+    const tint = (chroma: number) => Math.min(chroma * tintStrength, tintCap);
+    const sourceSurfaceChroma = dark ? Math.min(primaryCoordinates.chroma, surfacePolicy.dark.maximumTintChroma) : Math.min(primaryCoordinates.chroma * surfacePolicy.light.primaryChromaScale, surfacePolicy.light.baseChroma + sourceChroma * surfacePolicy.light.wallpaperChromaScale);
+    const surfaceChroma = tint(sourceSurfaceChroma);
     const editorBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.backgroundLightness : baseLightness, chroma: surfaceChroma, hueDegrees: primaryCoordinates.hueDegrees });
-    const panelBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.panelLightness : baseLightness - surfacePolicy.lightOffsets.panel, chroma: dark ? surfaceChroma : surfaceChroma * surfacePolicy.lightTintScales.panel, hueDegrees: primaryCoordinates.hueDegrees });
-    const fieldBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.fieldLightness : baseLightness - surfacePolicy.lightOffsets.field, chroma: dark ? surfaceChroma : surfaceChroma * surfacePolicy.lightTintScales.field, hueDegrees: primaryCoordinates.hueDegrees });
-    const selectionBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.selectionLightness : baseLightness - surfacePolicy.lightOffsets.selection, chroma: Math.min(primaryCoordinates.chroma, surfacePolicy.selectionChroma[appearance]), hueDegrees: primaryCoordinates.hueDegrees });
-    const hoverBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.hoverLightness : baseLightness - surfacePolicy.lightOffsets.hover, chroma: dark ? surfaceChroma : surfaceChroma * surfacePolicy.lightTintScales.hover, hueDegrees: primaryCoordinates.hueDegrees });
+    const panelBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.panelLightness : baseLightness - surfacePolicy.lightOffsets.panel, chroma: tint(dark ? sourceSurfaceChroma : sourceSurfaceChroma * surfacePolicy.lightTintScales.panel), hueDegrees: primaryCoordinates.hueDegrees });
+    const fieldBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.fieldLightness : baseLightness - surfacePolicy.lightOffsets.field, chroma: tint(dark ? sourceSurfaceChroma : sourceSurfaceChroma * surfacePolicy.lightTintScales.field), hueDegrees: primaryCoordinates.hueDegrees });
+    const selectionBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.selectionLightness : baseLightness - surfacePolicy.lightOffsets.selection, chroma: Math.min(primaryCoordinates.chroma, surfacePolicy.selectionChroma[appearance], !dark && backgroundTint === 'subtle' ? 0.025 : Infinity), hueDegrees: primaryCoordinates.hueDegrees });
+    const hoverBackground = fromOklch({ lightness: dark ? surfacePolicy.dark.hoverLightness : baseLightness - surfacePolicy.lightOffsets.hover, chroma: tint(dark ? sourceSurfaceChroma : sourceSurfaceChroma * surfacePolicy.lightTintScales.hover), hueDegrees: primaryCoordinates.hueDegrees });
     const textBackgrounds = [editorBackground, panelBackground, fieldBackground, selectionBackground, hoverBackground];
     const colors: Record<string, HexColorCode> = {};
     const roles: Role[] = [];

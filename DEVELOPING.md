@@ -107,3 +107,11 @@ Try colorful and grayscale JPEG/PNG wallpapers in both appearances, plus BMP on 
 Then change the wallpaper with auto-sync enabled, select a different theme to verify pausing, edit a generated setting, and run Restore to confirm the manual edit survives. Run Restore in the development window when you want to remove its applied theme settings.
 
 See [Architecture](ARCHITECTURE.md) for module boundaries and color algorithms, or return to the [user guide](README.md).
+
+## Automatic setup and independent sync checks
+
+The lifecycle unit suite runs activation against controlled VS Code/platform adapters. It checks first installation, migration, welcome state, all four sync combinations, retained swatches across restart/source removal, cancellation, manual sync, and Restore. Native providers expose appearance reads that do not discover or decode a wallpaper. Existing native CI tests still run on their matching OS.
+
+In a fresh VS Code profile, install the VSIX and verify immediate system-mode wallpaper sync and the one-time welcome page. Reopen the window and verify the page does not reopen. Check both status-bar toggles independently, then change the wallpaper and system mode. With wallpaper sync off, appearance must follow using the previous image's palette. Select another VS Code theme to confirm Paused; Restore must disable both sources.
+
+Compare saturated blue/green wallpapers using all light tint presets. Subtle should keep editor, sidebar, status bar, and input surfaces quiet while vibrant syntax retains multiple hues. Dark defaults must match the original colorful policy. The two appearance-specific tint settings must not affect each other's output.

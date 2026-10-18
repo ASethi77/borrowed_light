@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Disposable, WallpaperProvider, Wallpaper } from '../contracts';
 import { ProcessRunner, runProcess } from '../process';
 import { wallpaperPath, wallpaperUri } from '../../image/source';
-import { wallpaperScript } from './scripts';
+import { wallpaperScript, appearanceScript } from './scripts';
 
 export function osascriptArguments(script: string): string[] { return ['-l', 'JavaScript', '-e', script]; }
 interface Selection { provider?: string; configuration?: { assetID?: string; url?: { relative?: string } }; files?: { relative?: string }[] }
@@ -40,6 +40,11 @@ export class MacosProvider implements WallpaperProvider {
     async available(): Promise<boolean> {
         try { await this.run('/usr/bin/osascript', osascriptArguments("'ready'")); return true; }
         catch { return false; }
+    }
+    async appearance(): Promise<'light' | 'dark'> {
+        const appearance = (await this.run('/usr/bin/osascript', osascriptArguments(appearanceScript))).toString('utf8').trim();
+        if (appearance !== 'light' && appearance !== 'dark') { throw new Error('Invalid system appearance response'); }
+        return appearance;
     }
     async current(): Promise<Wallpaper> {
         const value = JSON.parse((await this.run('/usr/bin/osascript', osascriptArguments(wallpaperScript))).toString('utf8')) as { uri: string | null; appearance: string; selection?: Selection };

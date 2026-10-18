@@ -4,6 +4,9 @@ import { indicatorContrast, normalTextContrast } from './color/contrast';
 export const harmonies = ['analogous', 'monochromatic', 'triad', 'complementary', 'compound', 'shades'] as const;
 export type Harmony = typeof harmonies[number];
 export type Appearance = 'dark' | 'light';
+export const backgroundTints = ['subtle', 'balanced', 'colorful'] as const;
+export type BackgroundTint = typeof backgroundTints[number];
+export type BackgroundTints = Record<Appearance, BackgroundTint>;
 export const syntaxStyles = ['mellow', 'balanced', 'vibrant', 'vibrant-alt'] as const;
 export type SyntaxStyle = typeof syntaxStyles[number];
 export const borderContrasts = ['mellow', 'balanced', 'vibrant'] as const;
@@ -36,7 +39,7 @@ export interface GeneratedTheme {
     roles: Role[];
     checks: ContrastCheck[];
 }
-export interface PaletteResult { swatches: Swatch[]; palette: HexColorCode[]; neutral: boolean; primary: PrimaryColor; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast; theme: GeneratedTheme }
+export interface PaletteResult { swatches: Swatch[]; palette: HexColorCode[]; neutral: boolean; primary: PrimaryColor; syntaxStyle: SyntaxStyle; borderContrast: BorderContrast; backgroundTint: BackgroundTint; theme: GeneratedTheme }
 export type PreviewVariants = Record<Harmony, Record<Appearance, PaletteResult>>;
 export interface PipelineInput {
     path?: string;
@@ -49,4 +52,6 @@ export interface PipelineInput {
     primaries?: PrimaryChoices;
     syntaxStyle?: SyntaxStyle;
     borderContrast?: BorderContrast;
+    backgroundTint?: BackgroundTint;
+    backgroundTints?: BackgroundTints;
 }

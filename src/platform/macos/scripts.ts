@@ -40,3 +40,11 @@ function run() {
     return JSON.stringify({ uri: url && !url.isNil() ? ObjC.unwrap(url.absoluteString) : null, appearance: appearance, selection: selection });
 }
 `;
+
+/** Fresh preferences query, independent of the wallpaper store or desktop image. */
+export const appearanceScript = String.raw`
+ObjC.import('AppKit');
+function run() {
+    return ObjC.unwrap($.NSUserDefaults.standardUserDefaults.stringForKey('AppleInterfaceStyle')) === 'Dark' ? 'dark' : 'light';
+}
+`;

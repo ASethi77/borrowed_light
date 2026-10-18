@@ -40,7 +40,7 @@ if (parentPort) {
                     : await decodeImage(input.path, convertNative);
                 swatches = extractRepresentativeColors(image.data, image.width, image.height);
             }
-            port.postMessage({ result: input.previews ? generateVariants(swatches, input.primaries, input.syntaxStyle, input.borderContrast) : generateVariant(swatches, input.harmony!, input.appearance!, input.primary, input.syntaxStyle, input.borderContrast) });
+            port.postMessage({ result: input.previews ? generateVariants(swatches, input.primaries, input.syntaxStyle, input.borderContrast, input.backgroundTints) : generateVariant(swatches, input.harmony!, input.appearance!, input.primary, input.syntaxStyle, input.borderContrast, input.backgroundTint) });
         } catch (error) { port.postMessage({ error: error instanceof Error ? error.message : String(error) }); }
         finally { port.close(); }
     })();

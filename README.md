@@ -30,7 +30,7 @@ Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpa
 ## Get started
 
 1. Install a Borrowed Light VSIX using **Extensions: Install from VSIX…**. Successful [CI runs](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml) provide a `borrowed-light-vsix` download containing the VSIX.
-2. Open the Command Palette and run **Borrowed Light: Sync Theme from Wallpaper**.
+2. On a new installation, Borrowed Light immediately syncs to your wallpaper and system light/dark mode, then opens a welcome page. Existing installations keep their settings and selected theme. Run **Borrowed Light: Sync Theme from Wallpaper** whenever you want to sync manually.
 3. Click **Borrowed Light** in the status bar, or run **Borrowed Light: Preview Color Schemes**, to explore alternatives.
 
 The initial theme follows desktop light/dark appearance and uses the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
@@ -40,7 +40,7 @@ For quick settings changes, use the Command Palette:
 - **Borrowed Light: Toggle Automatic Wallpaper Sync** turns wallpaper monitoring on or off.
 - **Borrowed Light: Toggle Following Desktop Light/Dark Appearance** switches between following the desktop and keeping the currently visible light/dark appearance.
 
-The toggles save your preferences independently. Following desktop changes automatically requires automatic sync; with it off, run Sync manually. Border and syntax preferences stay unchanged.
+The toggles operate independently. With wallpaper sync off, system light/dark following uses your last synced wallpaper palette, even after restarting VS Code. The **Wallpaper** and **System** status-bar controls show On, Off, Syncing, Paused, or Error; click either one to toggle it. Selecting another VS Code theme pauses automatic updates. Reopen the setup guide with **Borrowed Light: Show Welcome**.
 
 ## Make it your own
 
@@ -56,6 +56,8 @@ The preview updates your actual editor and workbench as you make changes.
 | **Enter** | Keep the preview and save your choices |
 | **Escape** or click outside | Return to your starting theme |
 
+Light backgrounds default to a subtle tint. Set `borrowed-light.backgroundTintLight` to `subtle`, `balanced`, or `colorful` to adjust surface saturation. `borrowed-light.backgroundTintDark` controls dark surfaces separately and defaults to `colorful`, preserving the original dark styling. Tint leaves the wallpaper palette used for syntax highlighting intact.
+
 **Mellow** uses soft colors, **Balanced** adds moderate colorfulness, and **Vibrant** gives syntax categories more distinct colors. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
 
 Accepting a preview never overwrites `borrowed-light.appearance`, including an unset default or `desktop`. Use the desktop-following command or Settings to change that preference explicitly. Turning following off saves the current editor’s light/dark mode.
@@ -64,7 +66,7 @@ Primary hue tweaks are specific to the wallpaper. Syncing a new image (including
 
 Border contrast is a separate preference, shared between light and dark themes. **Mellow** gives subtle muted separators, **Balanced** gives moderately visible muted separators, and **Vibrant** preserves the original strong wallpaper-colored outlines. Focus indicators and control outlines stay visible. Cycle the border button to preview the change and press Enter to save; Escape or clicking outside restores your earlier borders. The saved choice persists across wallpaper syncs and syntax/color-rule changes. The default remains Vibrant until you choose another setting.
 
-Enable `borrowed-light.autoSync` in Settings to update when your wallpaper changes. Windows listens for desktop/theme registry changes and watches the wallpaper cache, with a five-minute safety check for missed changes. If its event monitor fails, it falls back to 30-second checks. It uses built-in Windows PowerShell; no extra installation is needed. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds; GNOME listens for settings changes. Auto-sync is off by default and pauses when you select a different theme. With auto-sync off, run Sync again after changing the wallpaper or settings.
+Wallpaper and system appearance syncing are enabled by default on new installations. Existing installations keep their previous wallpaper sync preference. Enable `borrowed-light.autoSync` in Settings to follow wallpaper changes. Windows listens for desktop/theme registry changes and watches the wallpaper cache, with a five-minute safety check for missed changes. If its event monitor fails, it falls back to 30-second checks. It uses built-in Windows PowerShell; no extra installation is needed. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds; GNOME listens for settings changes. With wallpaper sync off, run Sync to adopt a new wallpaper. Explicit visual preference changes still update the last synced palette.
 
 ## Demos
 
@@ -80,7 +82,7 @@ Enable `borrowed-light.autoSync` in Settings to update when your wallpaper chang
 
 Generated text colors are adjusted for readability. Run **Borrowed Light: Show Palette and Contrast Report** to inspect the colors and contrast checks if something looks off. User customizations and other extensions can affect the result.
 
-Run **Borrowed Light: Restore Previous Theme** to turn off auto-sync and restore your earlier theme settings. Later manual edits are preserved where they differ from the generated values. Run Restore before uninstalling if you want the generated settings removed; disabling or uninstalling alone leaves the applied theme settings in place.
+Run **Borrowed Light: Restore Previous Theme** to disable both wallpaper and system appearance syncing and restore your earlier theme settings. Later manual edits are preserved where they differ from the generated values. Run Restore before uninstalling if you want the generated settings removed; disabling or uninstalling alone leaves the applied theme settings in place.
 
 If sync fails, your last working theme stays in place. Open the **Borrowed Light** Output channel for details.
 

@@ -163,3 +163,10 @@ try {
     $source.Dispose()
 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 `;
+
+/** Registry-only query: appearance following must not depend on wallpaper discovery. */
+export const appearanceScript = String.raw`
+$ErrorActionPreference = 'Stop'
+$theme = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -ErrorAction SilentlyContinue
+[Console]::Write($(if ($null -ne $theme -and $theme.SystemUsesLightTheme -eq 0) { 'dark' } else { 'light' }))
+`;

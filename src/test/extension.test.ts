@@ -28,7 +28,7 @@ class Memory implements vscode.Memento {
 const palette = ['#5a8cab', '#d79e63', '#8eb886', '#bd88c7', '#bf7272'].map(parseHexColorCode);
 suite('Borrowed Light extension host', () => {
     const config = () => vscode.workspace.getConfiguration();
-    const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.borderContrast', 'borrowed-light.platformProvider'];
+    const sections = [...customizationSections, 'workbench.colorTheme', 'borrowed-light.autoSync', 'borrowed-light.harmony', 'borrowed-light.appearance', 'borrowed-light.primaryDark', 'borrowed-light.primaryLight', 'borrowed-light.syntaxStyle', 'borrowed-light.borderContrast', 'borrowed-light.backgroundTintLight', 'borrowed-light.backgroundTintDark', 'borrowed-light.platformProvider'];
     let originals: Record<string, unknown>;
     setup(() => {
         originals = Object.fromEntries(sections.map(section => [section, config().inspect(section)?.globalValue]));
@@ -36,16 +36,28 @@ suite('Borrowed Light extension host', () => {
     teardown(async () => {
         for (const section of sections) { await config().update(section, originals[section], vscode.ConfigurationTarget.Global); }
     });
-    test('extension loads with all six commands and both theme contributions', async () => {
+    test('extension loads with all seven commands and both theme contributions', async () => {
         const extension = vscode.extensions.getExtension('borrowed-light-local.borrowed-light');
         assert.ok(extension);
         await extension.activate();
         assert.equal(extension.packageJSON.displayName, 'Borrowed Light');
         const commands = await vscode.commands.getCommands(true);
-        for (const name of ['sync', 'report', 'restore', 'preview', 'toggleAutoSync', 'toggleDesktopAppearance']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
+        for (const name of ['sync', 'report', 'restore', 'preview', 'toggleAutoSync', 'toggleDesktopAppearance', 'welcome']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
         assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { label: string }) => theme.label), Object.values(themeLabels));
         assert.deepEqual(extension.packageJSON.contributes.themes.map((theme: { id: string }) => theme.id), Object.values(themeNames));
         assert.ok(extension.packageJSON.contributes.commands.every((command: { title: string }) => command.title.startsWith('Borrowed Light:')));
+    });
+    test('welcome command opens and reuses a real webview tab', async () => {
+        const tabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(tab => tab.label === 'Welcome to Borrowed Light');
+        const before = new Set(tabs());
+        await vscode.commands.executeCommand('borrowed-light.welcome');
+        for (let attempt = 0; attempt < 100 && !tabs().length; attempt++) { await new Promise(resolve => setTimeout(resolve, 20)); }
+        assert.ok(tabs().length, 'Welcome webview tab opens');
+        const opened = tabs()[0];
+        assert.ok(opened.input instanceof vscode.TabInputWebview);
+        await vscode.commands.executeCommand('borrowed-light.welcome');
+        assert.equal(tabs().length, 1);
+        if (!before.has(opened)) { await vscode.window.tabGroups.close(opened); }
     });
     test('Command Palette toggles automatic sync without changing appearance or border/syntax preferences', async () => {
         await config().update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
