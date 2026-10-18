@@ -24,7 +24,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await configAtStartup.update('autoSync', false, vscode.ConfigurationTarget.Global);
     }
     if (installation !== 'initialized') { await context.globalState.update(installationKey, true); }
-    const welcome = new WelcomePage();
+    const welcome = new WelcomePage(context.extensionUri);
     const snapshots = new WallpaperSnapshots(context.globalState);
     const output = vscode.window.createOutputChannel('Borrowed Light');
     const platform = detectPlatform();
@@ -219,7 +219,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     wallpaperStatus.command = 'borrowed-light.toggleAutoSync';
     appearanceStatus.command = 'borrowed-light.toggleDesktopAppearance';
     updateStatus = () => {
-        welcome.syncing(automaticEnabled() && application.ownedThemeActive);
+        welcome.syncing(
+            syncIndicatorState(followsWallpaper(), application.ownedThemeActive, busy, lastError),
+            syncIndicatorState(followsAppearance(), application.ownedThemeActive, busy, lastError),
+        );
         for (const [item, label, icon, enabled] of [
             [wallpaperStatus, 'Wallpaper', 'file-media', followsWallpaper()],
             [appearanceStatus, 'System', 'color-mode', followsAppearance()],

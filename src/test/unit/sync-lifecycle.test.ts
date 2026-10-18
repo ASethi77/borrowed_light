@@ -60,7 +60,7 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
     const subscriptions: { dispose(): void }[] = [];
     const commands = new Map<string, () => Promise<void>>();
     const statuses: { text: string; tooltip?: string; name?: string; command?: string }[] = [];
-    const panels: { webview: { html: string }; options: unknown; disposed: boolean }[] = [];
+    const panels: { webview: { html: string; messages: { state: string; sync: { wallpaper: string; appearance: string } }[] }; options: unknown; disposed: boolean }[] = [];
     const applied: PaletteResult['theme'][] = [];
     const tintCalls: { appearance: Appearance; tint?: string }[] = [];
     let monitorFailure = (_error: Error) => {};
@@ -82,6 +82,7 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
         watch: (changed, failed) => { watchCallback = changed; monitorFailure = failed; return disposable(); },
     };
     const fakeVscode = {
+        Uri: { joinPath: (base: string, ...parts: string[]) => [base, ...parts].join('/') },
         ConfigurationTarget: { Global: 1 }, StatusBarAlignment: { Right: 1 }, ViewColumn: { Active: 1 }, ColorThemeKind: { Light: 1, HighContrastLight: 4 },
         workspace: { getConfiguration: (section?: string) => configuration(section ? section + '.' : ''), onDidChangeConfiguration: (listener: typeof listeners extends Set<infer T> ? T : never) => { listeners.add(listener); return { dispose: () => listeners.delete(listener) }; } },
         window: {
@@ -90,7 +91,7 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
             showInformationMessage() {}, showErrorMessage() {},
             createStatusBarItem: () => { const item = { ...disposable(), text: '', show() {} }; statuses.push(item); return item; },
             createWebviewPanel: (_type: string, _title: string, _column: unknown, options: unknown) => {
-                const panel = { webview: { html: '' }, options, disposed: false, reveal() {}, onDidDispose: disposable, dispose() { this.disposed = true; } };
+                const panel = { webview: { html: '', messages: [] as (typeof panels)[number]['webview']['messages'], cspSource: 'https://webview.test', asWebviewUri: (uri: string) => uri, onDidReceiveMessage: disposable, postMessage(message: (typeof panels)[number]['webview']['messages'][number]) { this.messages.push(message); } }, options, disposed: false, reveal() {}, onDidDispose: disposable, dispose() { this.disposed = true; } };
                 panels.push(panel); return panel;
             },
         },
@@ -136,7 +137,7 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
         return module.exports as ReturnType<typeof load>;
     };
     const activation = load(resolve(__dirname, '../../extension.js'));
-    await activation.activate({ globalState: state, extension: { packageJSON: manifest }, subscriptions, asAbsolutePath: (path: string) => resolve(path) });
+    await activation.activate({ extensionUri: 'https://webview.test/extension', globalState: state, extension: { packageJSON: manifest }, subscriptions, asAbsolutePath: (path: string) => resolve(path) });
     const flush = async () => {
         const pending = [...timers.values()]; timers.clear(); pending.forEach(callback => callback());
         for (let attempts = 0; attempts < 30; attempts++) { await new Promise(resolve => setTimeout(resolve, 5)); }
@@ -158,7 +159,7 @@ test('fresh install automatically selects system mode, saves a palette and shows
         assert.equal(host.values['workbench.colorTheme'], themeNames.light);
         assert.ok(new WallpaperSnapshots(host.state).read());
         assert.equal(host.panels.length, 1);
-        assert.match(host.panels[0].webview.html, /Your VS Code theme is now syncing/);
+        assert.equal(host.panels[0].webview.messages.at(-1)?.state, 'ready');
         assert.ok(host.statuses.some(item => item.text.includes('Wallpaper: On')));
         assert.ok(host.statuses.some(item => item.text.includes('System: On')));
         const next = await harness(host.state, host.values);
@@ -180,8 +181,7 @@ test('failed first sync preserves theme, reports failure, and does not reopen we
     const host = await harness(new Memory(), {}, true);
     try {
         assert.equal(host.applied.length, 0);
-        assert.match(host.panels[0].webview.html, /could not be synced/);
-        assert.doesNotMatch(host.panels[0].webview.html, /Your VS Code theme is now syncing/);
+        assert.equal(host.panels[0].webview.messages.at(-1)?.state, 'failed');
         assert.ok(host.statuses.some(item => item.text.includes('Wallpaper: Error')));
         const next = await harness(host.state, host.values, true);
         try { assert.equal(next.panels.length, 0); }
@@ -269,8 +269,7 @@ test('interrupted first setup respects a different selected theme and finishes w
     try {
         assert.equal(host.values['workbench.colorTheme'], 'Solarized Light');
         assert.equal(host.applied.length, 0);
-        assert.doesNotMatch(host.panels[0].webview.html, /Setting up your wallpaper theme/);
-        assert.doesNotMatch(host.panels[0].webview.html, /Your VS Code theme is now syncing/);
+        assert.equal(host.panels[0].webview.messages.at(-1)?.state, 'paused');
         await host.flush(); assert.equal(host.applied.length, 0);
     } finally { await host.dispose(); }
 });
@@ -289,15 +288,57 @@ test('welcome offers restricted command links and reuses the panel', async () =>
     const host = await harness();
     try {
         const options = host.panels[0].options as { enableScripts: boolean; enableCommandUris: string[]; localResourceRoots: unknown[] };
-        assert.equal(options.enableScripts, false);
+        assert.equal(options.enableScripts, true);
         assert.ok(options.enableCommandUris.includes('borrowed-light.preview'));
         assert.ok(!options.enableCommandUris.includes('workbench.action.terminal.new'));
-        assert.deepEqual(options.localResourceRoots.length, 0);
+        assert.equal(options.localResourceRoots.length, 1);
+        assert.match(String(options.localResourceRoots[0]), /docs\/demo$/);
         assert.match(host.panels[0].webview.html, /Content-Security-Policy/);
-        assert.match(decodeURIComponent(host.panels[0].webview.html), /borrowed-light.backgroundTintLight/);
-        assert.match(decodeURIComponent(host.panels[0].webview.html), /borrowed-light.backgroundTintDark/);
+        const links = [...host.panels[0].webview.html.matchAll(/href="(command:[^"]+)"/g)].map(match => decodeURIComponent(match[1]));
+        assert.ok(links.some(link => link.includes('borrowed-light.backgroundTintLight')));
+        assert.ok(links.some(link => link.includes('borrowed-light.backgroundTintDark')));
         await host.commands.get('borrowed-light.welcome')!();
         assert.equal(host.panels.length, 1);
+    } finally { await host.dispose(); }
+});
+
+test('welcome embeds ordered demos and updates independent statuses without reloading video', async () => {
+    const host = await harness();
+    try {
+        const webview = host.panels[0].webview;
+        const html = webview.html;
+        const videos = [...html.matchAll(/<source src="([^"]+)"/g)].map(match => match[1].split('/').at(-1));
+        assert.deepEqual(videos, ['system_syncing_demo.mp4', 'background_hue_selection.mp4', 'syntax_highlighting_options.mp4']);
+        assert.match(html, /media-src https:\/\/webview.test/);
+        assert.match(html, /script-src 'nonce-[a-f0-9]+'/);
+        const elements = Object.fromEntries(['welcome-message', 'wallpaper-status', 'appearance-status'].map(id => [id, { textContent: '', dataset: { state: '' } }]));
+        let receive!: (event: { data: unknown }) => void;
+        let ready = false;
+        const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/.exec(html)![1];
+        runInNewContext(script, {
+            window: { addEventListener: (_event: string, listener: typeof receive) => { receive = listener; } },
+            document: { getElementById: (id: string) => elements[id] },
+            acquireVsCodeApi: () => ({ postMessage: (message: { type: string }) => { ready = message.type === 'welcomeReady'; } }),
+        });
+        assert.ok(ready, 'webview requests latest state after its listener is ready');
+        receive({ data: webview.messages.at(-1) });
+        assert.equal(elements['wallpaper-status'].textContent, '✓ Synced to desktop');
+        assert.equal(elements['appearance-status'].textContent, '✓ Synced to desktop');
+        for (const wallpaper of [false, true]) {
+            for (const appearance of [false, true]) {
+                await host.update('borrowed-light.autoSync', wallpaper);
+                await host.update('borrowed-light.appearance', appearance ? 'desktop' : 'light');
+                await host.flush();
+                receive({ data: webview.messages.at(-1) });
+                assert.equal(elements['wallpaper-status'].textContent, wallpaper ? '✓ Synced to desktop' : '✕ Off');
+                assert.equal(elements['appearance-status'].textContent, appearance ? '✓ Synced to desktop' : '✕ Off');
+                assert.equal(webview.html, html, 'status changes preserve video elements');
+            }
+        }
+        await host.update('workbench.colorTheme', 'Solarized Light');
+        receive({ data: webview.messages.at(-1) });
+        assert.equal(elements['wallpaper-status'].textContent, '✕ Paused');
+        assert.equal(elements['appearance-status'].textContent, '✕ Paused');
     } finally { await host.dispose(); }
 });
 
