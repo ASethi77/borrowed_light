@@ -150,8 +150,8 @@
             "vibrant-alt"
           ],
           "enumDescriptions": [
-            "Soft harmony colors with neutral identifiers.",
-            "Moderately saturated harmony colors with neutral identifiers.",
+            "Moderately saturated harmony colors with neutral identifiers (the former Balanced look).",
+            "Distinct colorful wallpaper accents with stronger foreground contrast and neutral identifiers.",
             "Distinct wallpaper and harmony-derived accents for syntax families, including identifiers, parameters and properties.",
             "The vibrant palette with a different assignment to syntax categories."
           ],
@@ -171,7 +171,7 @@
             "Moderate, muted pane separators.",
             "Strong wallpaper-colored pane outlines."
           ],
-          "default": "vibrant",
+          "default": "balanced",
           "scope": "application",
           "description": "Contrast of decorative pane and widget borders. Independent of syntax colors; focus and control outlines retain their visibility. Preview changes are saved only when accepted."
         },

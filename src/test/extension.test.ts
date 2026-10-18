@@ -251,7 +251,7 @@ suite('Borrowed Light extension host', () => {
             await waitFor('triad');
             // Acceptance waits for pending configuration writes, including the final requested preview.
             await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
-            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'vibrant' });
+            assert.deepEqual(await picker.closed, { harmony: 'triad', appearance: 'dark', primaries: { dark: 'automatic', light: 'automatic' }, syntaxStyle: 'balanced', borderContrast: 'balanced' });
             assert.equal(config().get('borrowed-light.harmony'), 'triad');
             assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, originals['borrowed-light.appearance']);
             assert.deepEqual(errors, []);

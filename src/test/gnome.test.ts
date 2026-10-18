@@ -61,6 +61,7 @@ suite('GNOME wallpaper smoke test', () => {
         const fixtures = await mkdtemp(join(tmpdir(), 'borrowed-light-editors-'));
         try {
             await config.update('borrowed-light.autoSync', false, vscode.ConfigurationTarget.Global);
+            await config.update('borrowed-light.harmony', 'analogous', vscode.ConfigurationTarget.Global);
             for (const appearance of ['dark', 'light']) {
                 await config.update('borrowed-light.appearance', appearance, vscode.ConfigurationTarget.Global);
                 await vscode.commands.executeCommand('borrowed-light.sync');
@@ -91,16 +92,18 @@ suite('GNOME wallpaper smoke test', () => {
                 }
                 await vscode.commands.executeCommand('workbench.action.closeAllEditors');
             }
-            const keyword = () => {
-                const tokens = vscode.workspace.getConfiguration().inspect<Values>('editor.tokenColorCustomizations')!.globalValue!['[Borrowed Light (Light)]'] as { textMateRules: { settings: { foreground: string } }[] };
-                return tokens.textMateRules[1].settings.foreground;
-            };
-            const previousKeyword = keyword();
+            // Balanced retains observed wallpaper keyword hues across color rules. Verify
+            // regeneration using the workbench palette rather than one stable syntax token.
+            const generatedPalette = () => JSON.stringify(vscode.workspace.getConfiguration().inspect<Values>('workbench.colorCustomizations')?.globalValue?.['[Borrowed Light (Light)]']);
+            const previousPalette = generatedPalette();
             await config.update('borrowed-light.autoSync', true, vscode.ConfigurationTarget.Global);
             await config.update('borrowed-light.harmony', 'compound', vscode.ConfigurationTarget.Global);
             const deadline = Date.now() + 10000;
-            while (keyword() === previousKeyword && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 100)); }
-            assert.notEqual(keyword(), previousKeyword, 'opt-in monitoring regenerates on palette settings changes');
+            while (generatedPalette() === previousPalette && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 100)); }
+            assert.notEqual(generatedPalette(), previousPalette, 'opt-in monitoring regenerates on palette settings changes');
+            // Workbench colors are written before token colors. Await the serialized Sync
+            // command before taking the baseline for the separate pause assertion.
+            await vscode.commands.executeCommand('borrowed-light.sync');
             await config.update('workbench.colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Global);
             const paused = vscode.workspace.getConfiguration().inspect('editor.tokenColorCustomizations')?.globalValue;
             await config.update('borrowed-light.harmony', 'monochromatic', vscode.ConfigurationTarget.Global);

@@ -30,7 +30,7 @@ const statusColors = {
 
 export const themeNames = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
 export const themeLabels = { dark: 'Borrowed Light (Dark)', light: 'Borrowed Light (Light)' };
-export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'vibrant', backgroundTint: BackgroundTint = appearance === 'dark' ? 'colorful' : 'subtle'): GeneratedTheme {
+export function generateTheme(palette: HexColorCode[], appearance: Appearance, policy: ContrastPolicy = balancedPolicy, swatches: Swatch[] = [], primary: HexColorCode = palette[surfacePolicy.automaticPrimaryIndex], syntaxStyle: SyntaxStyle = 'balanced', borderContrast: BorderContrast = 'balanced', backgroundTint: BackgroundTint = appearance === 'dark' ? 'colorful' : 'subtle'): GeneratedTheme {
     if (palette.length !== surfacePolicy.harmonySize) { throw new Error('Expected five harmony colors'); }
     const primaryCoordinates = toOklch(primary);
     const dark = appearance === 'dark';

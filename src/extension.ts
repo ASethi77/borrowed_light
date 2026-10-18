@@ -77,7 +77,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!isPrimaryChoice(requestedPrimaries.dark) || !isPrimaryChoice(requestedPrimaries.light)) { throw new Error('Unknown primary color setting'); }
         const syntaxStyle = config.get<SyntaxStyle>('syntaxStyle', 'balanced');
         if (!syntaxStyles.includes(syntaxStyle)) { throw new Error('Unknown syntax style setting'); }
-        const borderContrast = config.get<BorderContrast>('borderContrast', 'vibrant');
+        const borderContrast = config.get<BorderContrast>('borderContrast', 'balanced');
         if (!borderContrasts.includes(borderContrast)) { throw new Error('Unknown border contrast setting'); }
         const tints: BackgroundTints = { light: config.get<BackgroundTint>('backgroundTintLight', 'subtle'), dark: config.get<BackgroundTint>('backgroundTintDark', 'colorful') };
         if (!Object.values(tints).every(tint => backgroundTints.includes(tint))) { throw new Error('Unknown background tint setting'); }

@@ -9,7 +9,7 @@ import { Appearance, harmonies, syntaxStyles } from '../../model';
 import { generateTheme } from '../../color/theme';
 import { generateVariant } from '../../variants';
 import { isPrimaryChoice, primaryColors, resolvePrimary } from '../../primary';
-import { syntaxSources } from '../../color/syntax';
+import { syntaxSources, balancedSources } from '../../color/syntax';
 
 const swatches = [{ hex: parseHexColorCode('#248abb'), weight: 0.7 }, { hex: parseHexColorCode('#dc7b4d'), weight: 0.3 }];
 test('WCAG reference ratios, symmetry, and diagonal', () => {
@@ -131,7 +131,12 @@ test('vibrant syntax uses separated wallpaper highlights and colors identifiers 
         const vibrant = generateVariant(wallpaper, 'monochromatic', appearance, 'wallpaper-2', 'vibrant').theme;
         assert.deepEqual(vibrant.colors, mellow.colors, 'syntax changes leave the workbench intact');
         assert.equal(mellow.semanticRules.variable, mellow.colors['editor.foreground']);
-        for (const category of ['keyword', 'string', 'number', 'function', 'type', 'variable', 'parameter', 'property']) {
+        // Distinct hue assignments encounter different sRGB gamut limits. Compare overall
+        // colorfulness rather than requiring every individual hue to have greater chroma.
+        const categories = ['keyword', 'string', 'number', 'function', 'type', 'variable', 'parameter', 'property'];
+        const totalChroma = (theme: typeof vibrant) => categories.reduce((sum, category) => sum + toOklch(theme.semanticRules[category]).chroma, 0);
+        assert.ok(totalChroma(vibrant) > totalChroma(mellow));
+        for (const category of ['variable', 'parameter', 'property']) {
             assert.ok(toOklch(vibrant.semanticRules[category]).chroma > toOklch(mellow.semanticRules[category]).chroma);
         }
         assert.ok(new Set(['keyword', 'string', 'number', 'function'].map(key => Math.round(toOklch(vibrant.semanticRules[key]).hueDegrees / 15))).size >= 4);
@@ -207,11 +212,12 @@ test('light tint is subdued while default dark styling matches the original colo
     for (const hex of ['#0088ff', '#00cc66', '#cc3344', '#888888']) {
         const swatches = [{ hex: parseHexColorCode(hex), weight: 1 }];
         const light = generateVariant(swatches, 'triad', 'light');
+        assert.equal(light.borderContrast, 'balanced');
         for (const surface of ['editor.background', 'statusBar.background', 'input.background', 'list.hoverBackground']) {
             assert.ok(toOklch(light.theme.colors[surface]).chroma < 0.021, `${hex}/${surface}`);
         }
         const dark = generateVariant(swatches, 'triad', 'dark');
-        const original = generateVariant(swatches, 'triad', 'dark', 'automatic', 'balanced', 'vibrant', 'colorful');
+        const original = generateVariant(swatches, 'triad', 'dark', 'automatic', 'balanced', 'balanced', 'colorful');
         assert.deepEqual(dark, original);
         for (const tint of ['subtle', 'balanced', 'colorful'] as const) {
             for (const appearance of ['light', 'dark'] as const) {
@@ -221,4 +227,34 @@ test('light tint is subdued while default dark styling matches the original colo
             }
         }
     }
+});
+
+test('Balanced favors colorful wallpaper highlights with stronger foreground contrast than Mellow', () => {
+    const wallpaper = [
+        { hex: parseHexColorCode('#229944'), weight: 0.85 },
+        { hex: parseHexColorCode('#2266cc'), weight: 0.05 },
+        { hex: parseHexColorCode('#eedd22'), weight: 0.05 },
+        { hex: parseHexColorCode('#cc3322'), weight: 0.05 },
+    ];
+    const categories = ['keyword', 'string', 'number', 'function', 'type'];
+    for (const harmony of ['monochromatic', 'analogous', 'shades'] as const) {
+        const palette = generateHarmonyPalette(wallpaper, harmony).palette;
+        const sources = balancedSources(wallpaper, palette);
+        wallpaper.forEach(swatch => assert.ok(sources.includes(swatch.hex), `${harmony}: retain observed highlight ${swatch.hex}`));
+        for (const appearance of ['light', 'dark'] as const) {
+            const balanced = generateVariant(wallpaper, harmony, appearance, 'automatic', 'balanced').theme;
+            const mellow = generateVariant(wallpaper, harmony, appearance, 'automatic', 'mellow').theme;
+            assert.deepEqual(balanced.colors, mellow.colors, 'syntax style does not change workbench surfaces or borders');
+            assert.equal(balanced.semanticRules.variable, balanced.colors['editor.foreground']);
+            const hues = categories.map(category => Math.round(toOklch(balanced.semanticRules[category]).hueDegrees / 20));
+            assert.ok(new Set(hues).size >= 4, `${appearance}/${harmony}: distinct syntax hues`);
+            const meanChroma = (theme: typeof balanced) => categories.reduce((sum, category) => sum + toOklch(theme.semanticRules[category]).chroma, 0) / categories.length;
+            const meanContrast = (theme: typeof balanced) => categories.reduce((sum, category) => sum + contrastRatio(theme.semanticRules[category], theme.colors['editor.background']), 0) / categories.length;
+            assert.ok(meanChroma(balanced) > meanChroma(mellow), `${appearance}/${harmony}: stronger colorfulness`);
+            assert.ok(meanContrast(balanced) > meanContrast(mellow), `${appearance}/${harmony}: stronger foreground contrast`);
+            balanced.checks.forEach(check => assert.ok(check.ratio >= check.minimum));
+        }
+    }
+    const gray = [{ hex: parseHexColorCode('#999999'), weight: 1 }];
+    assert.deepEqual(balancedSources(gray, generateHarmonyPalette(gray, 'triad').palette), [gray[0].hex]);
 });

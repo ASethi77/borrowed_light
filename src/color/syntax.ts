@@ -7,8 +7,9 @@ import { Appearance, Swatch, SyntaxStyle } from '../model';
 const syntaxPolicy = {
     familyCount: 6, observedSeparationDegrees: 25, vibrantSeparationDegrees: 40,
     derivedLightness: 0.65, derivedChroma: 0.16,
-    mellow: { scale: 0.3, maximumChroma: 0.045 },
-    balanced: { scale: 0.7, maximumChroma: 0.11 },
+    // Mellow retains the former Balanced treatment for a restrained, familiar option.
+    mellow: { scale: 0.7, maximumChroma: 0.11 },
+    balanced: { scale: 1.1, minimumChroma: 0.10, maximumChroma: 0.18, lightness: { dark: 0.80, light: 0.36 } },
     vibrant: { scale: 1.35, minimumChroma: 0.14, maximumChroma: 0.24 },
     baseLightness: { dark: 0.73, light: 0.43 },
 };
@@ -31,6 +32,24 @@ export function syntaxSources(swatches: Swatch[], fallback: HexColorCode[]): Hex
         })).sort((first, second) => second.distance - first.distance || second.weight - first.weight || first.hex.localeCompare(second.hex));
         if (!remaining.length || remaining[0].distance < syntaxPolicy.observedSeparationDegrees) { break; }
         selected.push(remaining[0].hex);
+    }
+    return selected;
+}
+
+/** Balanced gives observed wallpaper highlights priority over the selected harmony.
+ * Fill unused family slots with sufficiently separated harmony hues, without inventing
+ * the additional hue-wheel accents reserved for Vibrant. Grayscale stays neutral.
+ */
+export function balancedSources(swatches: Swatch[], palette: HexColorCode[]): HexColorCode[] {
+    const observed = syntaxSources(swatches, palette);
+    const selected = observed.filter(colorCode => toOklch(colorCode).chroma >= minimumChromaticChroma);
+    if (!selected.length) { return observed; }
+    while (selected.length < syntaxPolicy.familyCount) {
+        const candidates = palette.filter(colorCode => !selected.includes(colorCode) && toOklch(colorCode).chroma >= minimumChromaticChroma)
+            .map(hex => ({ hex, distance: Math.min(...selected.map(chosen => hueDistance(toOklch(hex).hueDegrees, toOklch(chosen).hueDegrees))) }))
+            .sort((first, second) => second.distance - first.distance || first.hex.localeCompare(second.hex));
+        if (!candidates.length || candidates[0].distance < syntaxPolicy.observedSeparationDegrees) { break; }
+        selected.push(candidates[0].hex);
     }
     return selected;
 }
@@ -64,20 +83,20 @@ export function vibrantSources(swatches: Swatch[], palette: HexColorCode[]): Hex
 const familyLightnessOffsets = { keywords: 0.02, strings: -0.02, constants: 0.04, functions: 0, types: -0.01, identifiers: 0.01 };
 export type SyntaxFamilyColors = Record<keyof typeof familyLightnessOffsets, HexColorCode>;
 
-/** Assign semantic families in stable order. Mellow/balanced reuse the harmony;
- * vibrant expands its hue coverage, and alternate rotates assignments by one slot.
+/** Assign semantic families in stable order. Mellow uses the harmony; Balanced favors
+ * colorful wallpaper swatches; Vibrant expands hue coverage, and alternate rotates it.
  * Saturation is adjusted here; final surface contrast is enforced by theme generation.
  */
 export function syntaxColors(swatches: Swatch[], fallback: HexColorCode[], appearance: Appearance, style: SyntaxStyle): SyntaxFamilyColors {
-    const sources = style === 'mellow' || style === 'balanced' ? fallback : vibrantSources(swatches, fallback);
+    const sources = style === 'mellow' ? fallback : style === 'balanced' ? balancedSources(swatches, fallback) : vibrantSources(swatches, fallback);
     const sourceRotation = style === 'vibrant-alt' ? 1 : 0;
     const vivid = style === 'vibrant' || style === 'vibrant-alt';
     return Object.fromEntries(Object.entries(familyLightnessOffsets).map(([family, lightnessOffset], index) => {
         const source = toOklch(sources[(index + sourceRotation) % sources.length]);
         const chroma = style === 'mellow' ? Math.min(source.chroma * syntaxPolicy.mellow.scale, syntaxPolicy.mellow.maximumChroma)
             : vivid ? (source.chroma < minimumChromaticChroma ? 0 : Math.min(Math.max(source.chroma * syntaxPolicy.vibrant.scale, syntaxPolicy.vibrant.minimumChroma), syntaxPolicy.vibrant.maximumChroma))
-                : Math.min(source.chroma * syntaxPolicy.balanced.scale, syntaxPolicy.balanced.maximumChroma);
-        const lightness = syntaxPolicy.baseLightness[appearance] + lightnessOffset;
+                : source.chroma < minimumChromaticChroma ? 0 : Math.min(Math.max(source.chroma * syntaxPolicy.balanced.scale, syntaxPolicy.balanced.minimumChroma), syntaxPolicy.balanced.maximumChroma);
+        const lightness = (style === 'balanced' ? syntaxPolicy.balanced.lightness[appearance] : syntaxPolicy.baseLightness[appearance]) + lightnessOffset;
         return [family, fromOklch({ lightness, chroma, hueDegrees: source.hueDegrees })];
     })) as SyntaxFamilyColors;
 }

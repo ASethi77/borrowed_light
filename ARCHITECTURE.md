@@ -61,7 +61,7 @@ All preferences are application-scoped under `borrowed-light.*`.
 | `primaryDark` | `automatic` | `automatic`, `wallpaper-1`…`wallpaper-8`, `harmony-1`…`harmony-5` |
 | `primaryLight` | `automatic` | Same source slots, remembered independently for the current wallpaper |
 | `syntaxStyle` | `balanced` | `mellow`, `balanced`, `vibrant`, `vibrant-alt` |
-| `borderContrast` | `vibrant` | `mellow`, `balanced`, `vibrant`; independent decorative pane contrast |
+| `borderContrast` | `balanced` | `mellow`, `balanced`, `vibrant`; independent decorative pane contrast |
 | `platformProvider` | `auto` | `auto`, `windows`, `macos`, `linux-gnome`; overrides must match the host OS |
 | `autoSync` | `true` | Wallpaper following; migration preserves the previous effective value for existing installations |
 | `backgroundTintLight` | `subtle` | `subtle`, `balanced`, `colorful`; light surface saturation |
@@ -134,10 +134,12 @@ Syntax roles cover keywords, strings, numbers/constants, functions, types, and i
 
 | Style | Color source and adjustment | Identifier treatment |
 | --- | --- | --- |
-| Mellow | Harmony palette with strongly reduced chroma | Close to primary text color |
-| Balanced | Harmony palette with moderate chroma | Neutral identifiers; default style |
+| Mellow | Harmony palette with moderate chroma; retains the former Balanced treatment | Neutral identifiers |
+| Balanced | Prioritize separated colorful wallpaper swatches, then harmony hues; boost chroma and foreground/background separation | Neutral identifiers; default style |
 | Vibrant | Separated observed wallpaper hues plus harmony/derived accents, with stronger chroma | Colorful variables, parameters, and properties |
 | Vibrant Alternate | Same vibrant palette, rotated by one source slot | Different assignment of colors to syntax families |
+
+Balanced starts with observed colorful wallpaper swatches separated by at least 25°, preserving small highlights even when the harmony is monochromatic. It fills remaining slots with sufficiently separated harmony colors, without deriving extra hues. Its darker light-theme foregrounds and brighter dark-theme foregrounds provide stronger contrast; final quantized colors still pass the shared contrast checks.
 
 Vibrant selection first chooses separated observed hues, then combines them with harmony candidates. It favors candidates at least 40° from already selected hues. If fewer than six sufficiently distinct sources exist, it derives more accents by bisecting the largest remaining hue-wheel gaps. This keeps a mostly green wallpaper from making every syntax family green. Derived accents are not reported as extracted wallpaper colors; fully grayscale sources remain neutral.
 
