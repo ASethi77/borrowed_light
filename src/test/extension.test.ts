@@ -40,6 +40,8 @@ suite('Borrowed Light extension host', () => {
         const extension = vscode.extensions.getExtension('borrowed-light-local.borrowed-light');
         assert.ok(extension);
         await extension.activate();
+        assert.equal(config().inspect('borrowed-light.autoSync')?.globalValue, false, 'host profile disables wallpaper automation before activation');
+        assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, 'dark', 'host profile fixes appearance before activation');
         assert.equal(extension.packageJSON.displayName, 'Borrowed Light');
         const commands = await vscode.commands.getCommands(true);
         for (const name of ['sync', 'report', 'restore', 'preview', 'toggleAutoSync', 'toggleDesktopAppearance', 'welcome']) { assert.ok(commands.includes(`borrowed-light.${name}`)); }
