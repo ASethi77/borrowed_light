@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.o.13
+
+- Add icon + demo videos to the welcome page.
+
 ## 0.0.12
 
 - Follow desktop light/dark appearance by default.
