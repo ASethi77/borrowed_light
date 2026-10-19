@@ -51,6 +51,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let writes = Promise.resolve();
     let preview: PreviewPicker | undefined;
     let previewOpening = false;
+    let confirmation: vscode.Disposable | undefined;
+    const confirm = (message: string) => {
+        if (disposed) { return; }
+        confirmation?.dispose();
+        // Completing the progress task dismisses its notification, including on replacement.
+        void vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification, title: message, cancellable: false,
+        }, () => new Promise<void>(resolve => {
+            const dismiss = () => { clearTimeout(timeout); resolve(); };
+            const timeout = setTimeout(dismiss, 5000);
+            confirmation = { dispose: dismiss };
+        }));
+    };
     const reportWorkers = new Set<AbortController>();
     const settings = () => vscode.workspace.getConfiguration('borrowed-light');
     const serialized = (action: () => Promise<void>): Promise<void> => {
@@ -144,7 +157,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 if (manual) {
                     const warnings = application.overrideWarnings(result.theme);
                     if (warnings.length) { output.appendLine(warnings.join('\n')); }
-                    void vscode.window.showInformationMessage(warnings.length ? 'Wallpaper theme generated. Some settings may override it; see the contrast report.' : 'Theme synced to your wallpaper.');
+                    if (warnings.length) {
+                        void vscode.window.showInformationMessage('Wallpaper theme generated. Some settings may override it; see the contrast report.');
+                    } else { confirm('Theme synced to your wallpaper.'); }
                 }
             });
         } catch (value) { if (currentRevision === revision) { error(value, manual); if (bootstrap) { welcome.update('failed'); } } }
@@ -252,7 +267,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 await serialized(async () => {
                     const enabled = !settings().get<boolean>('autoSync', true);
                     await settings().update('autoSync', enabled, vscode.ConfigurationTarget.Global);
-                    void vscode.window.showInformationMessage(enabled
+                    confirm(enabled
                         ? `Automatic wallpaper sync enabled.${application.ownedThemeActive ? '' : ' Run Sync Theme from Wallpaper to select Borrowed Light.'}`
                         : 'Automatic wallpaper sync disabled.');
                 });
@@ -267,7 +282,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     const light = application.active === themeNames.light || (application.active !== themeNames.dark &&
                         [vscode.ColorThemeKind.Light, vscode.ColorThemeKind.HighContrastLight].includes(vscode.window.activeColorTheme.kind));
                     await settings().update('appearance', following ? 'desktop' : light ? 'light' : 'dark', vscode.ConfigurationTarget.Global);
-                    void vscode.window.showInformationMessage(following
+                    confirm(following
                         ? `Following desktop light/dark appearance.${followsWallpaper() ? '' : ' Using the last synced wallpaper palette.'}`
                         : `Desktop appearance following disabled. Keeping ${light ? 'light' : 'dark'} appearance.`);
                 });
@@ -299,7 +314,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     await application.restore();
                     signature = '';
                 });
-                void vscode.window.showInformationMessage('Previous theme restored. Wallpaper and system appearance syncing are off.');
+                confirm('Previous theme restored. Wallpaper and system appearance syncing are off.');
             } catch (value) { error(value, true); }
         }),
         vscode.workspace.onDidChangeConfiguration(event => {
@@ -341,7 +356,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 else { schedule(); }
             }
         }),
-        { dispose: () => { disposed = true; cancel(); stop(); reportWorkers.forEach(worker => worker.abort()); void preview?.cancel(); } },
+        { dispose: () => { disposed = true; confirmation?.dispose(); cancel(); stop(); reportWorkers.forEach(worker => worker.abort()); void preview?.cancel(); } },
     );
     if (installation === 'fresh') {
         welcome.update('pending'); welcome.show();

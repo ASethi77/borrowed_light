@@ -57,6 +57,8 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
     const values: Record<string, unknown> = { ...explicit };
     const listeners = new Set<(event: { affectsConfiguration(key: string): boolean }) => void>();
     const timers = new Map<number, () => void>();
+    const timeoutDurations = new Map<number, number>();
+    const notifications: { title: string; location: number; cancellable: boolean; closed: boolean }[] = [];
     const subscriptions: { dispose(): void }[] = [];
     const commands = new Map<string, () => Promise<void>>();
     const statuses: { text: string; tooltip?: string; name?: string; command?: string }[] = [];
@@ -83,12 +85,18 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
     };
     const fakeVscode = {
         Uri: { joinPath: (base: string, ...parts: string[]) => [base, ...parts].join('/') },
+        ProgressLocation: { Notification: 15 },
         ConfigurationTarget: { Global: 1 }, StatusBarAlignment: { Right: 1 }, ViewColumn: { Active: 1 }, ColorThemeKind: { Light: 1, HighContrastLight: 4 },
         workspace: { getConfiguration: (section?: string) => configuration(section ? section + '.' : ''), onDidChangeConfiguration: (listener: typeof listeners extends Set<infer T> ? T : never) => { listeners.add(listener); return { dispose: () => listeners.delete(listener) }; } },
         window: {
             activeColorTheme: { kind: 1 },
             createOutputChannel: () => ({ ...disposable(), appendLine() {} }),
             showInformationMessage() {}, showErrorMessage() {},
+            withProgress: (options: { title: string; location: number; cancellable: boolean }, task: () => Promise<void>) => {
+                const notification = { ...options, closed: false };
+                notifications.push(notification);
+                return task().then(() => { notification.closed = true; });
+            },
             createStatusBarItem: () => { const item = { ...disposable(), text: '', show() {} }; statuses.push(item); return item; },
             createWebviewPanel: (_type: string, _title: string, _column: unknown, options: unknown) => {
                 const panel = { webview: { html: '', messages: [] as (typeof panels)[number]['webview']['messages'], cspSource: 'https://webview.test', asWebviewUri: (uri: string) => uri, onDidReceiveMessage: disposable, postMessage(message: (typeof panels)[number]['webview']['messages'][number]) { this.messages.push(message); } }, options, disposed: false, reveal() {}, onDidDispose: disposable, dispose() { this.disposed = true; } };
@@ -130,7 +138,7 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
             return localRequire(name);
         };
         const wrapper = runInNewContext(`(function(require,module,exports){${readFileSync(filename, 'utf8')}\n})`, {
-            setTimeout: (callback: () => void) => { timers.set(++timerID, callback); return timerID; }, clearTimeout: (id: number) => timers.delete(id),
+            setTimeout: (callback: () => void, duration: number) => { timers.set(++timerID, callback); timeoutDurations.set(timerID, duration); return timerID; }, clearTimeout: (id: number) => timers.delete(id),
             setInterval: () => ++timerID, clearInterval() {}, AbortController,
         });
         wrapper(requireMock, module, module.exports);
@@ -143,7 +151,8 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
         for (let attempts = 0; attempts < 30; attempts++) { await new Promise(resolve => setTimeout(resolve, 5)); }
     };
     return {
-        state, values, statuses, panels, applied, commands, imagePath, tintCalls,
+        state, values, statuses, panels, applied, commands, imagePath, tintCalls, notifications,
+        get pendingTimeouts() { return [...timers.keys()].map(id => timeoutDurations.get(id)); },
         failMonitor: () => monitorFailure(new Error('Monitor unavailable')),
         get currentCalls() { return currentCalls; }, get appearanceCalls() { return appearanceCalls; },
         setMode(value: Appearance) { mode = value; watchCallback(); }, setSwatches(value: Swatch[]) { swatches = value; watchCallback(); },
@@ -151,6 +160,30 @@ async function harness(state = new Memory(), explicit: Record<string, unknown> =
         async dispose() { for (const subscription of subscriptions.reverse()) { subscription.dispose(); } await rm(directory, { recursive: true, force: true }); },
     };
 }
+
+test('confirmation popups expire after five seconds and close on replacement or disposal', async () => {
+    const host = await harness();
+    try {
+        await host.commands.get('borrowed-light.toggleAutoSync')!();
+        assert.equal(host.notifications[0].title, 'Automatic wallpaper sync disabled.');
+        assert.equal(host.notifications[0].location, 15);
+        assert.equal(host.notifications[0].cancellable, false);
+        assert.equal(host.notifications[0].closed, false);
+        assert.ok(host.pendingTimeouts.includes(5000));
+
+        await host.commands.get('borrowed-light.toggleAutoSync')!();
+        assert.equal(host.notifications[0].closed, true);
+        assert.equal(host.notifications[1].closed, false);
+        assert.match(host.notifications[1].title, /Automatic wallpaper sync enabled/);
+        await host.flush();
+        assert.equal(host.notifications[1].closed, true);
+
+        await host.commands.get('borrowed-light.toggleDesktopAppearance')!();
+        assert.equal(host.notifications[2].closed, false);
+    } finally { await host.dispose(); }
+    assert.equal(host.notifications[2].closed, true);
+    assert.equal(host.pendingTimeouts.length, 0);
+});
 
 test('fresh install automatically selects system mode, saves a palette and shows welcome once', async () => {
     const host = await harness();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.16
+
+- Add auto-dismissal for stale notifications
+
 ## 0.0.15
 
 - Add support for ultra-high-resolution images (up to 512 megapixels)
