@@ -27,11 +27,7 @@ https://github.com/user-attachments/assets/bc38d629-6a72-4620-b992-29f1d968931e
 | Linux (Generic)              | GNOME                                    | Untested, but should work with GNOME |
 | Linux (Generic)               | KDE, Xfce, Cinnamon, MATE, and other desktops | Untested, not yet supported |
 
-Use VS Code **1.128 or later** with a local wallpaper. Windows/Linux source images support up to **64 MiB / 32 megapixels**. Windows and macOS normalize local images to thumbnails up to 1024 pixels on the longest edge before palette extraction to bound worker memory use. macOS can also normalize larger built-in source wallpapers. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
-
-On modern macOS, selected image and aerial wallpapers are resolved from the local wallpaper store. Aerial wallpapers use Apple’s locally cached preview image; their palette represents that preview rather than the exact live frame. If the preview is missing, open Wallpaper settings to download it and retry. The store format is undocumented and can change between macOS releases.
-
-Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpaper**. VS Code for the Web, live wallpapers other than macOS aerial previews, solid-color backgrounds, and GNOME XML slideshows are unsupported. Windows/macOS use the primary display's wallpaper; GNOME uses its configured wallpaper image. Multi-image files use the first still frame, which may differ from macOS's active dynamic wallpaper frame.
+Use VS Code **1.128 or later** with a local wallpaper.
 
 ## Get started
 
@@ -58,18 +54,6 @@ The preview updates your actual editor and workbench as you make changes.
 | Syntax button (keyword icon) | Mellow, Balanced, Vibrant, or Vibrant Alternate highlighting |
 | **Enter** | Keep the preview and save your choices |
 | **Escape** or click outside | Return to your starting theme |
-
-Light backgrounds default to a subtle tint. Set `borrowed-light.backgroundTintLight` to `subtle`, `balanced`, or `colorful` to adjust surface saturation. `borrowed-light.backgroundTintDark` controls dark surfaces separately and defaults to `colorful`, preserving the original dark styling. Tint leaves the wallpaper palette used for syntax highlighting intact.
-
-**Mellow** uses the former Balanced look: moderately saturated harmony colors with neutral identifiers. **Balanced** favors colorful wallpaper highlights, stronger foreground contrast, and more distinct syntax categories while keeping identifiers neutral. **Vibrant** adds a broader, more saturated palette and colors identifiers as well. **Vibrant Alternate** changes which colors go to which categories. Syntax style is shared between light and dark themes.
-
-Accepting a preview never overwrites `borrowed-light.appearance`, including an unset default or `desktop`. Use the desktop-following command or Settings to change that preference explicitly. Turning following off saves the current editor’s light/dark mode.
-
-Primary hue tweaks are specific to the wallpaper. Syncing a new image (including replacing the file at the same path) resets both light and dark primary choices to `automatic`. Syncing the same wallpaper keeps your tweaks, including across restarts; accepting a new preview can override the automatic choices again. Syntax, border contrast, and color-rule preferences are retained.
-
-Border contrast is a separate preference, shared between light and dark themes. **Mellow** gives subtle muted separators, **Balanced** gives moderately visible muted separators, and **Vibrant** preserves the original strong wallpaper-colored outlines. Focus indicators and control outlines stay visible. Cycle the border button to preview the change and press Enter to save; Escape or clicking outside restores your earlier borders. The saved choice persists across wallpaper syncs and syntax/color-rule changes. The default is Balanced until you choose another setting.
-
-Wallpaper and system appearance syncing are enabled by default on new installations. Existing installations keep their previous wallpaper sync preference. Enable `borrowed-light.autoSync` in Settings to follow wallpaper changes. Windows listens for desktop/theme registry changes and watches the wallpaper cache, with a five-minute safety check for missed changes. If its event monitor fails, it falls back to 30-second checks. It uses built-in Windows PowerShell; no extra installation is needed. macOS watches the wallpaper store and checks wallpaper/appearance changes every five seconds; GNOME listens for settings changes. With wallpaper sync off, run Sync to adopt a new wallpaper. Explicit visual preference changes still update the last synced palette.
 
 ## Demos
 
