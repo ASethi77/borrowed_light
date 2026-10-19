@@ -1,4 +1,6 @@
 const esbuild = require("esbuild");
+const fs = require('node:fs');
+const crypto = require('node:crypto');
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -24,8 +26,14 @@ const esbuildProblemMatcherPlugin = {
 };
 
 async function main() {
+	const artifacts = require('./codec/artifacts.json');
+	for (const [name, expected] of Object.entries(artifacts.sha256)) {
+		if (crypto.createHash('sha256').update(fs.readFileSync(`codec/${name}`)).digest('hex') !== expected) { throw new Error(`Codec checksum mismatch: ${name}`); }
+	}
+	fs.mkdirSync('dist/codec', { recursive: true });
+	fs.cpSync('codec', 'dist/codec', { recursive: true });
 	const ctx = await esbuild.context({
-		entryPoints: ['src/extension.ts', 'src/palette-worker.ts'],
+		entryPoints: ['src/extension.ts', 'src/palette-worker.ts', 'src/thumbnail-worker.ts'],
 		bundle: true,
 		format: 'cjs',
 		minify: production,

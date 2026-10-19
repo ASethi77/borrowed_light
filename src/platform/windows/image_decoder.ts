@@ -26,5 +26,6 @@ export function windowsImageDecoder(run: ProcessRunner = runProcess): NativeImag
         if ((await inspectSource(path, policy)).fingerprint !== before.fingerprint) { throw new Error('Wallpaper changed during decoding; try syncing again'); }
         return png;
     };
+    Object.defineProperty(decoder, 'id', { value: 'windows-native' });
     return decoder;
 }

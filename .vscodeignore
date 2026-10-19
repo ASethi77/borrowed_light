@@ -1,5 +1,7 @@
 .vscode/**
 .github/**
+.cache/**
+profiling-results/**
 .vscode-test/**
 out/**
 node_modules/**
@@ -12,4 +14,6 @@ vsc-extension-quickstart.md
 **/eslint.config.mjs
 **/*.map
 **/*.ts
+tools/**
+codec/**
 **/.vscode-test.*

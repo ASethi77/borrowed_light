@@ -14,8 +14,8 @@ export function macosImageDecoder(run: ProcessRunner = runProcess): NativeImageD
         if (signal.aborted) { throw new Error('Platform helper cancelled'); }
         const before = await inspectSource(path, policy);
         const metadata = (await run('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', path], { signal, timeoutMs: 5000 })).toString('utf8');
-        const width = Number(/pixelWidth:\s*(\d+)/.exec(metadata)?.[1]);
-        const height = Number(/pixelHeight:\s*(\d+)/.exec(metadata)?.[1]);
+        const width = Number(/pixelWidth: *([0-9]+)/.exec(metadata)?.[1]);
+        const height = Number(/pixelHeight: *([0-9]+)/.exec(metadata)?.[1]);
         if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) { throw new Error('macOS cannot read wallpaper dimensions'); }
         checkDimensions(width, height, policy);
         const output = join(directory, 'normalized.png');
@@ -37,5 +37,6 @@ export function macosImageDecoder(run: ProcessRunner = runProcess): NativeImageD
         return normalize(input, directory, signal, policy);
     });
     decoder.fromFile = (path, signal, policy = imagePolicy()) => withDirectory(directory => normalize(path, directory, signal, policy));
+    Object.defineProperty(decoder, 'id', { value: 'macos-native' });
     return decoder;
 }

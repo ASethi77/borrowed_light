@@ -1,0 +1,17 @@
+{
+  "jpeg": {
+    "repository": "libjpeg-turbo/libjpeg-turbo",
+    "commit": "c85e6b905bf237038faa936dab160ebfc5da0344",
+    "sha256": "45209a3f315ed6156dac8d7fa451b8be62d83f2daa5581cb6b94ee9f3f82cf6f"
+  },
+  "png": {
+    "repository": "pnggroup/libpng",
+    "commit": "cd952f49f95bb27154ae77dbb103032d95f6e580",
+    "sha256": "ef1bccad2b2a58eb3c09e06ffe3b72b8604abda8b5011e4c4bb5391989040f26"
+  },
+  "zlib": {
+    "repository": "madler/zlib",
+    "commit": "da607da739fa6047df13e66a2af6b8bec7c2a498",
+    "sha256": "b9258cf6254e7f7c37f1cd61dba943a1c5ea3cff5718c789834dac359094f5f7"
+  }
+}

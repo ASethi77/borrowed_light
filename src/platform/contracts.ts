@@ -17,6 +17,7 @@ export interface WallpaperProvider {
  * so worker termination cannot orphan an OS helper. The signal covers the whole job.
  */
 export interface NativeImageDecoder {
+    readonly id?: string;
     (bytes: Uint8Array, signal: AbortSignal, policy?: ImagePolicy): Promise<Uint8Array>;
     /** Normalize directly from a local file without loading a large source into the worker. */
     fromFile?(path: string, signal: AbortSignal, policy?: ImagePolicy): Promise<Uint8Array>;
