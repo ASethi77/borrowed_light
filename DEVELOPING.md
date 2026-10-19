@@ -90,9 +90,21 @@ npm run package
 npm run vsix
 ```
 
-`package` performs type/lint checks and builds minified bundles. `vsix` invokes that production build through `vscode:prepublish`, then packages `borrowed-light-0.0.12.vsix`. The extension bundle, worker, themes, grammar contribution, and documentation are included; source/test/build tooling is excluded by [.vscodeignore](.vscodeignore). Install the result with **Extensions: Install from VSIX…**.
+`package` performs type/lint checks and builds minified bundles. `vsix` invokes that production build through `vscode:prepublish`, then packages `borrowed-light-<version>.vsix`, using the version in `package.json`. The extension bundle, worker, themes, grammar contribution, and documentation are included; source/test/build tooling is excluded by [.vscodeignore](.vscodeignore). Install the result with **Extensions: Install from VSIX…**.
 
-The `borrowed-light-local` publisher is a local packaging placeholder. Replace it with your registered publisher before Marketplace publication. The project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Before packaging a new release, bump the version with one of:
+
+```sh
+npm run bump -- patch    # 0.0.13 -> 0.0.14
+npm run bump -- minor    # 0.0.13 -> 0.1.0
+npm run bump -- major    # 0.0.13 -> 1.0.0
+npm run bump -- 1.2.3    # set an explicit version
+npm run vsix
+```
+
+`bump` updates `package.json` and `package-lock.json` together without creating a Git commit or tag. Commit both files with the release changes. The VSIX filename follows the version automatically; the packaging command needs no manual edits. Running `vsix` alone does not change the version.
+
+The publisher is `ASethi77`. The project has not selected a distribution license; the local packaging command skips that prompt. Bundled dependency licenses are reproduced in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Continuous integration
 

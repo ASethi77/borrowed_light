@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.o.13
+## 0.0.14
+
+Documentation updates.
+
+## 0.0.13
 
 - Add icon + demo videos to the welcome page.
 

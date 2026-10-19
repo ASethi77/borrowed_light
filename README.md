@@ -18,14 +18,14 @@ https://github.com/user-attachments/assets/bc38d629-6a72-4620-b992-29f1d968931e
 
 ## Supported platforms
 
-| Operating system          | Desktop environment                      | Status                                                                    |
-| ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
-| Windows                   | Windows desktop                          | Supported |
-| macOS                     | macOS desktop                            | Supported |
-| Fedora Linux              | GNOME                                    | Supported |
-| Ubuntu Linux              | GNOME                                    | Supported |
-| Linux (Generic)              | GNOME                                    | Untested, but should work with GNOME |
-| Linux (Generic)               | KDE, Xfce, Cinnamon, MATE, and other desktops | Untested, not yet supported |
+| Operating system | Desktop environment                           | Status                               |
+| ---------------- | --------------------------------------------- | ------------------------------------ |
+| Windows          | Windows desktop                               | Supported                            |
+| macOS            | macOS desktop                                 | Supported                            |
+| Fedora Linux     | GNOME                                         | Supported                            |
+| Ubuntu Linux     | GNOME                                         | Supported                            |
+| Linux (Generic)  | GNOME                                         | Unsupported, but should work with GNOME |
+| Linux (Generic)  | KDE, Xfce, Cinnamon, MATE, and other desktops | Unsupported       |
 
 Use VS Code **1.128 or later** with a local wallpaper.
 
