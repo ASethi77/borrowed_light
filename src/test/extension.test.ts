@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { runVariant } from '../pipeline';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 
 class Memory implements vscode.Memento {
     private values: Record<string, unknown> = {};
@@ -37,8 +38,10 @@ suite('Borrowed Light extension host', () => {
         for (const section of sections) { await config().update(section, originals[section], vscode.ConfigurationTarget.Global); }
     });
     test('extension loads with all seven commands and both theme contributions', async () => {
-        const extension = vscode.extensions.getExtension('borrowed-light-local.borrowed-light');
-        assert.ok(extension);
+        const manifest = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8'));
+        const extensionId = `${manifest.publisher}.${manifest.name}`;
+        const extension = vscode.extensions.getExtension(extensionId);
+        assert.ok(extension, `Extension ${extensionId} is registered`);
         await extension.activate();
         assert.equal(config().inspect('borrowed-light.autoSync')?.globalValue, false, 'host profile disables wallpaper automation before activation');
         assert.equal(config().inspect('borrowed-light.appearance')?.globalValue, 'dark', 'host profile fixes appearance before activation');
