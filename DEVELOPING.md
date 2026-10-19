@@ -23,7 +23,181 @@ For a terminal-driven watch session:
 npm run watch
 ```
 
-## Image resource qualification
+## Profiling images, palettes, and wallpaper sync
+
+Start with the measurement that matches the slowdown:
+
+| Question | Measurement | Includes |
+| --- | --- | --- |
+| Does a large wallpaper take too long or use too much memory? | Image profiler below | Source inspection, normalization, palette extraction, one generated theme, and cleanup |
+| Is decoding or palette generation responsible? | JSON stage timings, then the palette benchmark | Separate normalization and palette timings; optional CPU profile of palette functions |
+| Is changing the actual wallpaper slow? | Extension Development Host workflow below | Desktop discovery/notifications, debounce, pipeline, settings persistence, and visible theme application |
+
+The image profiler runs the production image pipeline outside VS Code. Its
+`--repeats` option repeats pipeline jobs; it does **not** exercise desktop
+notifications, the extension's saved-palette behavior, or VS Code theme writes.
+
+### Profile a real wallpaper first
+
+Run this from the repository root. An existing file needs Node/npm only; Python
+and Pillow are needed only when generating the fixture suites.
+
+```sh
+npm run profile:images -- --file "path/to/wallpaper.jpg" --decoder both --limit-mp 512 --runs 5 --repeats 20 --output profiling-results/wallpaper-baseline
+```
+
+For the reference wallpaper in Windows PowerShell:
+
+```powershell
+npm.cmd run profile:images -- --file "C:\Users\aakas\Pictures\yosemite_unsplash.jpg" --decoder both --limit-mp 512 --runs 5 --repeats 20 --output profiling-results/yosemite-baseline
+Invoke-Item profiling-results/yosemite-baseline/report.html
+```
+
+Open `report.html` for the overview, `report.csv` for comparisons, and
+`report.json` for stage timings and detailed memory data. The command builds
+first, but build time is excluded from the measurements. `--limit-mp` applies to
+this profiling run; it does not change the extension setting. `--decoder auto`
+tests the production choice (native on Windows/macOS, portable on Linux).
+
+Five runs produce five independent subprocess measurements per backend. The
+additional `-repeated` row runs 20 sequential pipeline jobs within one subprocess.
+For a quick debugging run use `--runs 1 --repeats 0`. Output files are overwritten
+when reusing a directory, so use separate `before` and `after` destinations.
+
+### Read stage timings and memory
+
+The JSON report's `rows` contain these measurements:
+
+| Field | Interpretation |
+| --- | --- |
+| `events`, stage `normalization` | File reads, decoder/helper startup, source checks, resize/orientation, and thumbnail PNG production; excludes time waiting for the shared normalization queue |
+| `events`, stage `palette` | From sending the thumbnail to receiving the result: thumbnail PNG decoding, representative-color extraction, harmony/theme generation, and message overhead |
+| `durationMs` | Entire measured job: initial source inspection, worker startup, queue waits, normalization, palette processing, correctness checks, and awaited cleanup; for repeated rows this covers all jobs |
+| `resources.sampledTreePeakBytes` | Highest sampled simultaneous RSS sum for the workload process and its helpers |
+| `nodeHighWaterBytes` | Node process OS high-water RSS; native helper processes are reported separately under `resources` |
+| `events`, stage `portable-memory` | WASM linear memory and worker memory snapshot near completion; not a continuous peak measurement |
+| `retained` | Node memory snapshots after each pipeline job; use repeated rows to inspect growth, allowing for GC and allocator reuse |
+| `activeResourceDelta` | Difference in active worker/helper resource counts after cleanup; positive values fail qualification |
+
+There is no separate disk-read timer: source reads overlap decoding and are
+included in normalization. Palette timing combines extraction and theme
+generation. Stage durations need not add up to `durationMs`, and unsuccessful
+stages may have no completion event. Divide repeated-row totals by `jobs` only
+when comparing average cost per job; keep peak memory as a peak.
+
+For a compact stage breakdown, save this as `.cache/read-image-profile.cjs`
+(create `.cache` first if needed), then run
+`node .cache/read-image-profile.cjs profiling-results/wallpaper-baseline/report.json`:
+
+```js
+const fs = require('node:fs');
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+console.table(report.rows.map(row => {
+    const averageStage = stage => (row.events ?? [])
+        .filter(event => event.stage === stage)
+        .reduce((sum, event) => sum + (event.durationMs ?? 0), 0) / row.jobs;
+    return {
+        case: row.id, decoder: row.decoder, outcome: row.outcome, jobs: row.jobs,
+        totalMsPerJob: row.durationMs / row.jobs,
+        normalizationMsPerJob: averageStage('normalization'),
+        paletteMsPerJob: averageStage('palette'),
+        peakMiB: (row.resources?.sampledTreePeakBytes ?? 0) / 1048576,
+        activeResourceDelta: row.activeResourceDelta,
+    };
+}));
+```
+
+Compare successful rows with identical source hashes, limits, Node versions,
+backends, and theme inputs. Compare several runs using the median and range,
+alongside peak memory; do not infer a regression from one run. A fresh subprocess
+does not imply cold filesystem caches. Keep the machine idle, record power mode,
+and compare platforms against their own baselines. The current CLI always
+generates one analogous dark theme with Balanced syntax and vibrant borders;
+it does not benchmark every preview or syntax/tint combination.
+
+### Isolate extraction and theme generation
+
+If palette time dominates, benchmark the synchronous functions with a bounded
+photographic fixture. This separates extraction from theme construction and lets
+Node capture their CPU stacks in the process doing the work. Run
+`npm run compile-tests`, then save this as `.cache/profile-palette.cjs`:
+
+```js
+const { readFileSync } = require('node:fs');
+const { performance } = require('node:perf_hooks');
+const { decodePixels } = require('../out/image/decode.js');
+const { extractRepresentativeColors } = require('../out/color/extraction.js');
+const { generateVariant, generateVariants } = require('../out/variants.js');
+const bytes = readFileSync('src/test/fixtures/astronaut.png');
+const pixels = decodePixels(bytes);
+const extract = () => extractRepresentativeColors(pixels.data, pixels.width, pixels.height);
+const swatches = extract();
+function measure(name, action, count = 20) {
+    action(); // Warm up separately from the timed iterations.
+    const start = performance.now();
+    for (let index = 0; index < count; index++) { action(); }
+    console.log(`${name}: ${((performance.now() - start) / count).toFixed(2)} ms/op`);
+}
+measure('thumbnail PNG decode', () => decodePixels(bytes));
+measure('palette extraction', extract);
+measure('one dark theme', () => generateVariant(swatches, 'analogous', 'dark'));
+measure('all 12 preview themes', () => generateVariants(swatches), 3);
+```
+
+```sh
+node .cache/profile-palette.cjs
+node --cpu-prof --cpu-prof-dir=.cache .cache/profile-palette.cjs
+```
+
+Open the generated `.cpuprofile` in VS Code to inspect expensive call stacks.
+Change the fixture and explicit `generateVariant` arguments to reproduce a
+specific harmony, appearance, syntax style, border contrast, or tint. These
+numbers exclude source normalization, worker startup/transfer, and theme
+application; use them to explain pipeline results, not as end-to-end latency.
+The profiler's main process and extension host CPU profiles do not capture all
+CPU stacks inside separate workers or native decoder helpers.
+
+### Measure actual wallpaper sync in VS Code
+
+1. Run `npm run compile`, then **F5** to open an Extension Development Host. Keep
+   other extensions and background work to a minimum. For comparable timings,
+   repeat without breakpoints; debugger pauses invalidate latency measurements.
+2. Open **View: Toggle Output**, select **Borrowed Light**, and run
+   **Borrowed Light: Sync Theme from Wallpaper** once to establish a saved palette.
+   For images above 256 MP, set `borrowed-light.maxImageMegapixels` to the same
+   limit used in the CLI run.
+3. Open **Developer: Show Running Extensions**, start recording an extension host
+   profile using its toolbar control, reproduce the scenario, stop, and save the
+   profile. This is the [VS Code extension profiling workflow](https://github.com/microsoft/vscode/wiki/Performance-Issues#profile-the-running-extensions).
+4. Use **Help: Open Process Explorer** to watch the extension host and helper
+   processes during the run. If the editor itself paints slowly, also capture the
+   renderer's Performance recording through **Help: Toggle Developer Tools**.
+   A renderer recording and an extension host recording cover different processes.
+5. Run each scenario below several times, changing one variable at a time. Keep
+   the image, settings, OS, VS Code version, and event-to-visible-update latency
+   with the saved profile and CLI report.
+
+| Scenario | How to reproduce | What it exercises |
+| --- | --- | --- |
+| Manual full sync | Run Sync Theme from Wallpaper repeatedly | Provider discovery, source inspection, full image pipeline, theme writes, and saved-palette persistence; manual sync refreshes even for the same file |
+| Automatic wallpaper change | Enable wallpaper following, select a Borrowed Light theme, then alternate two wallpapers through OS settings | Native notification/polling, 500 ms debounce, full pipeline, and theme application |
+| Appearance-only change | Disable wallpaper following, keep desktop appearance following enabled, then toggle system light/dark | Saved swatches and theme generation without reopening the source image |
+| Preview cost | Open Preview Color Schemes, then cycle rules/colors/syntax | Initial preview generation versus subsequent regeneration from swatches; report these separately |
+| Idle / cancellation | Leave syncing idle, then change wallpapers rapidly and select another theme | Idle CPU/memory, superseded-job cleanup, and absence of stale theme application |
+
+The Output channel records applied themes and errors, but currently has no
+per-stage sync timers. The CLI's `durationMs` is not desktop-event-to-visible-theme
+latency. For exact local wall-time attribution, temporarily add
+`performance.now()` timestamps in `src/extension.ts`: at provider notification
+before `schedule()`, entry to `sync()`, around `read()`, `generate()`,
+`application.apply()`, and the following persistence writes. Use one revision/job
+identifier so cancelled generations cannot be mixed together, and remove those
+probes after debugging. CPU profiles show execution hotspots, not all asynchronous
+waiting or renderer repaint time. Notification latency also depends on the
+provider's polling/fallback behavior. CI's current resource reports exercise the
+image pipeline; live desktop sync and visible repaint latency remain local checks.
+
+### Qualify generated large-image suites and CI reports
 
 Normal extension builds use the checked-in WASM codec and verify its SHA-256.
 Rebuilding it requires the development toolchain described in [codec/README.md](codec/README.md);
