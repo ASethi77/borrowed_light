@@ -1,8 +1,10 @@
 # Borrowed Light
 
-[![CI](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml)
+Turn your wallpaper into a VS Code theme. Automatically syncs wallpaper colors and system light/dark mode changes
+to create a theme fhat fits your desktop perfectly. No external softtware is required, and your wallpapers are never
+uploaded anywhere.
 
-Turn your desktop wallpaper into a readable VS Code theme. Borrowed Light colors the editor, syntax highlighting, workbench, and terminal palette, with live previews to help you find a look you like. Your wallpaper stays on your computer; images are never uploaded.
+[![CI](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml)
 
 https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
 
@@ -12,14 +14,14 @@ https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
 
 ## Supported platforms
 
-| Operating system | Desktop environment | Status |
-| --- | --- | --- |
-| Fedora Linux | GNOME | Supported; current development and testing target |
-| Other Linux distributions | GNOME | Uses the same provider; not yet validated |
-| Linux | KDE Plasma | Not yet supported |
-| Linux | Xfce, Cinnamon, MATE, and other desktops | Not yet supported |
-| Windows | Windows desktop | Validated with native wallpaper discovery and light/dark theme generation |
-| macOS | macOS desktop | Validated on a MacBook with Sequoia Sunrise; other macOS versions pending |
+| Operating system          | Desktop environment                      | Status                                                                    |
+| ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
+| Windows                   | Windows desktop                          | Supported |
+| macOS                     | macOS desktop                            | Supported |
+| Fedora Linux              | GNOME                                    | Supported |
+| Ubuntu Linux              | GNOME                                    | Supported |
+| Linux (Generic)              | GNOME                                    | Untested, but should work with GNOME |
+| Linux (Generic)               | KDE, Xfce, Cinnamon, MATE, and other desktops | Untested, not yet supported |
 
 Use VS Code **1.128 or later** with a local wallpaper. Windows/Linux source images support up to **64 MiB / 32 megapixels**. Windows and macOS normalize local images to thumbnails up to 1024 pixels on the longest edge before palette extraction to bound worker memory use. macOS can also normalize larger built-in source wallpapers. JPEG and PNG work on every supported desktop. Windows also uses native codecs for BMP; macOS uses native codecs for HEIC. Native normalization must also fit within 64 MiB. OS settings and built-in helpers must be accessible to VS Code; sandboxed installations or managed-device restrictions may prevent access.
 
@@ -29,18 +31,15 @@ Remote SSH, WSL, and Dev Container workspaces use your **local computer's wallpa
 
 ## Get started
 
-1. Install a Borrowed Light VSIX using **Extensions: Install from VSIX…**. Successful [CI runs](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml) provide a `borrowed-light-vsix` download containing the VSIX.
-2. On a new installation, Borrowed Light immediately syncs to your wallpaper and system light/dark mode, then opens a welcome page. Existing installations keep their settings and selected theme. Run **Borrowed Light: Sync Theme from Wallpaper** whenever you want to sync manually.
-3. Click **Borrowed Light** in the status bar, or run **Borrowed Light: Preview Color Schemes**, to explore alternatives.
+Install the extension from the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=asethi77.borrowed-light):
 
-The initial theme follows desktop light/dark appearance and uses the Analogous color rule. In VS Code Settings, set `borrowed-light.appearance` to `light`, `dark`, or `desktop` to follow your desktop's appearance. Platform detection is automatic; `borrowed-light.platformProvider` lets you override it, for example selecting `linux-gnome` in an ambiguous Linux session. Overrides must match your OS.
+> ext install asethi77.borrowed-light
 
-For quick settings changes, use the Command Palette:
+The extension will activate its color theme and begin syncing to your desktop settings as soon as you install.
 
-- **Borrowed Light: Toggle Automatic Wallpaper Sync** turns wallpaper monitoring on or off.
-- **Borrowed Light: Toggle Following Desktop Light/Dark Appearance** switches between following the desktop and keeping the currently visible light/dark appearance.
+You can change back to another theme or toggle wallpaper and/or light/dark mode syncs at anytime. The setup guide with **Borrowed Light: Show Welcome** walks through the available options.
 
-The toggles operate independently. With wallpaper sync off, system light/dark following uses your last synced wallpaper palette, even after restarting VS Code. The **Wallpaper** and **System** status-bar controls show On, Off, Syncing, Paused, or Error; click either one to toggle it. Selecting another VS Code theme pauses automatic updates. Reopen the setup guide with **Borrowed Light: Show Welcome**.
+> **Tip**: In the Command Palette, type `borrowed-light` to see all available commands.
 
 ## Make it your own
 
