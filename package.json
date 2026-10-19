@@ -2,7 +2,7 @@
   "name": "borrowed-light",
   "displayName": "Borrowed Light",
   "description": "Generate harmonious, readable VS Code themes from your desktop wallpaper",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "repository": {
     "type": "git",
     "url": "https://github.com/ASethi77/borrowed_light.git"
