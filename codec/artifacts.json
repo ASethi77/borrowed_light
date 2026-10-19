@@ -1,7 +1,7 @@
 {
   "emscripten": "4.0.20",
   "sha256": {
-    "thumbnail.cjs": "190a3329630bd6f6de7f3a3e2a48f4b2fe461a4ee036ca1cf1322d02b92ba71f",
+    "thumbnail.cjs": "8c38f6d96397a09d5f842c2db0de754320e827b108a80bc2801db9dd455fd745",
     "thumbnail.wasm": "4facc1839ae9f5de5364eefd46309c73da3ee4726ea225e7758b128f17bdbc65"
   }
 }

@@ -43,7 +43,7 @@ def main():
                 prefix = tar.getmembers()[0].name.split('/')[0]
                 tar.extractall(cache / f'extract-{name}', filter='data')
             shutil.move(str(cache / f'extract-{name}' / prefix), source)
-    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8', newline='\n')
     def run(command):
         subprocess.run([str(value) for value in command], cwd=ROOT, env=env, check=True)
     build = cache / 'jpeg-build'
@@ -63,17 +63,22 @@ def main():
          '-sMAXIMUM_MEMORY=4294967296', '-sINITIAL_MEMORY=16777216', '-sSTACK_SIZE=1048576', '-sWASM_ASYNC_COMPILATION=0',
          '-sEXPORTED_FUNCTIONS=["_normalize","_result_pixels","_result_width","_result_height","_result_error","_result_orientation"]',
          '-sEXPORTED_RUNTIME_METHODS=["UTF8ToString","HEAPU8"]', '-o', output])
+    # emcc emits host-specific text newlines and marks WASM executable on Unix.
+    # Canonicalize before hashing so Windows and Unix builds match in git.
+    output.write_text(output.read_text(encoding='utf-8'), encoding='utf-8', newline='\n')
+    for artifact in [output, output.with_suffix('.wasm')]:
+        artifact.chmod(0o644)
     licenses = ROOT / 'codec/licenses'
     licenses.mkdir(exist_ok=True)
-    license_text = (emscripten / 'LICENSE').read_text()
-    (licenses / 'emscripten-LICENSE').write_text('\n'.join(line.rstrip() for line in license_text.splitlines()).rstrip() + '\n')
+    license_text = (emscripten / 'LICENSE').read_text(encoding='utf-8')
+    (licenses / 'emscripten-LICENSE').write_text('\n'.join(line.rstrip() for line in license_text.splitlines()).rstrip() + '\n', encoding='utf-8', newline='\n')
     for source, candidates in [('jpeg', ['LICENSE.md', 'README.ijg']), ('png', ['LICENSE']), ('zlib', ['LICENSE'])]:
         for candidate in candidates:
             file = cache / source / candidate
             if file.exists():
                 shutil.copyfile(file, licenses / f'{source}-{candidate}')
     artifacts = {name: hashlib.sha256((ROOT / 'codec' / name).read_bytes()).hexdigest() for name in ['thumbnail.cjs', 'thumbnail.wasm']}
-    (ROOT / 'codec/artifacts.json').write_text(json.dumps({'emscripten': '4.0.20', 'sha256': artifacts}, indent=2) + '\n')
+    (ROOT / 'codec/artifacts.json').write_text(json.dumps({'emscripten': '4.0.20', 'sha256': artifacts}, indent=2) + '\n', encoding='utf-8', newline='\n')
 
 if __name__ == '__main__':
     main()

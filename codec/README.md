@@ -18,6 +18,11 @@ builds verify those artifact hashes and copy assets to `dist/codec`. An upstream
 upgrade requires updating the pinned commit and reviewing the corresponding source
 digest and licenses. CI rebuilds the module and runs its decoder tests.
 
+Before hashing, the build normalizes the generated JavaScript loader to UTF-8
+with LF line endings and sets both artifacts to non-executable file permissions
+(`0644` on Unix). This keeps Windows and Unix rebuilds identical; retain the
+byte-preserving Git attributes for the loader and WASM files.
+
 JPEG decoding uses reduced IDCT output and scanlines. PNG decoding processes rows
 and Adam7 passes; pixels are accumulated into bounded, opacity-weighted thumbnail
 bins. It never allocates a source-size RGBA image. Progressive JPEG still needs
