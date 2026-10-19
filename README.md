@@ -6,7 +6,11 @@ uploaded anywhere.
 
 [![CI](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/ASethi77/borrowed_light/actions/workflows/ci.yml)
 
-https://github.com/user-attachments/assets/fe179015-0882-4238-bf53-313f00dd7f96
+
+
+https://github.com/user-attachments/assets/bc38d629-6a72-4620-b992-29f1d968931e
+
+
 
 > **Automatically generate light and dark themes from the same wallpaper.** Preview both appearances, choose a primary hue for each, and keep your preferred theme.
 
@@ -71,9 +75,9 @@ Wallpaper and system appearance syncing are enabled by default on new installati
 
 | Demo | Preview |
 | --- | --- |
-| Syncing with a new wallpaper | _Video demo coming soon._ |
-| Changing the primary hue and color rule | _Video demo coming soon._ |
-| Changing syntax highlighting | _Video demo coming soon._ |
+| Syncing with a new wallpaper | https://github.com/user-attachments/assets/760ff19d-294c-486d-b2a3-bcfa9a960502 |
+| Changing the primary hue and color rule | https://github.com/user-attachments/assets/e890a531-f6fe-46c0-a513-e36a5176efbf |
+| Changing syntax highlighting | https://github.com/user-attachments/assets/aef11db3-2903-4686-9f97-29ba08b4f5a9  |
 
 <!-- TODO: Replace each demo placeholder with its recorded video. -->
 
