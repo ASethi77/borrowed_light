@@ -19,7 +19,7 @@ static int out_width, out_height, orientation = 1;
 static char error_text[512];
 
 static int dimensions(unsigned width, unsigned height, double max_pixels) {
-    if (!width || !height || width > 65535 || height > 65535 || (double)width * height > max_pixels) {
+    if (!width || !height || width > JPEG_MAX_DIMENSION || height > JPEG_MAX_DIMENSION || (double)width * height > max_pixels) {
         snprintf(error_text, sizeof(error_text), "Wallpaper dimensions exceed configured input limits (%u x %u)", width, height);
         return 0;
     }
@@ -151,11 +151,11 @@ static int decode_png(double max_pixels) {
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, png_failure, thumbnail_png_warning);
     if (!png) { strcpy(error_text, "Cannot allocate PNG decoder"); return 0; }
     png_infop info = png_create_info_struct(png);
-    unsigned char *row = NULL;
+    unsigned char *volatile row = NULL;
     if (!info) { png_destroy_read_struct(&png, NULL, NULL); strcpy(error_text, "Cannot allocate PNG metadata"); return 0; }
     if (setjmp(png_jmpbuf(png))) { free(row); png_destroy_read_struct(&png, &info, NULL); return 0; }
     png_set_read_fn(png, NULL, png_source);
-    png_set_user_limits(png, 65535, 65535);
+    png_set_user_limits(png, JPEG_MAX_DIMENSION, JPEG_MAX_DIMENSION);
     png_set_chunk_malloc_max(png, 16 * 1024 * 1024);
     png_set_crc_action(png, PNG_CRC_ERROR_QUIT, PNG_CRC_ERROR_QUIT);
     png_read_info(png, info);

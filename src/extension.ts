@@ -92,6 +92,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             wallpaper = await provider.current();
             path = wallpaperPath(wallpaper.uri);
             const metadata = await inspectSource(path, policy);
+            // Preserve the persisted wallpaper identity from earlier releases.
             sourceSignature = JSON.stringify([wallpaper.uri, ...JSON.parse(metadata.fingerprint)]);
         } else {
             wallpaper = { ...saved!.wallpaper, appearance: requested === 'desktop' ? await provider.appearance() : saved!.wallpaper.appearance };
@@ -304,6 +305,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('borrowed-light')) {
                 cancel(); signature = '';
+                if (event.affectsConfiguration('borrowed-light.maxImageMegapixels')) {
+                    cached = undefined;
+                    reportWorkers.forEach(worker => worker.abort());
+                    void preview?.cancel();
+                }
                 if (event.affectsConfiguration('borrowed-light.platformProvider')) {
                     stop();
                     reportWorkers.forEach(worker => worker.abort());

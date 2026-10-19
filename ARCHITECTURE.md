@@ -66,6 +66,7 @@ All preferences are application-scoped under `borrowed-light.*`.
 | `autoSync` | `true` | Wallpaper following; migration preserves the previous effective value for existing installations |
 | `backgroundTintLight` | `subtle` | `subtle`, `balanced`, `colorful`; light surface saturation |
 | `backgroundTintDark` | `colorful` | Same options; default retains original dark styling |
+| `maxImageMegapixels` | `256` | Integer 1�512; source acceptance limit, independent of process memory |
 
 ## Platform boundary
 
@@ -83,7 +84,7 @@ While auto-sync is enabled, one hidden Windows PowerShell helper blocks on [RegN
 
 macOS runs fixed JavaScript/Objective-C bridge code with `/usr/bin/osascript`. AppKit's first screen identifies the primary/menu-bar display; [NSWorkspace.desktopImageURL](https://developer.apple.com/documentation/appkit/nsworkspace/desktopimageurl(for:)) provides the legacy fallback. Modern image/aerial selections come from the primary display or shared entry in the user's wallpaper store; aerials use the local cached preview, since NSWorkspace can return a stale default image. The store is undocumented and may change between OS releases. Appearance reads the global AppleInterfaceStyle preference in a fresh helper. The implementation uses framework calls rather than controlling Finder/System Events through Apple Events.
 
-The local UI extension host owns platform helpers, including in remote workspaces. Helpers use fixed source and argument-based execution with bounded stdout/stderr, deadlines, and process termination on cancellation. Windows image bytes travel through stdin; macOS image paths travel as literal sips arguments. No external installations or native Node modules are required.
+The local UI extension host owns platform helpers, including in remote workspaces. Helpers use fixed source and argument-based execution with bounded stdout/stderr, deadlines, and process termination on cancellation. Windows image paths and policy travel as JSON through stdin; macOS image paths travel as literal sips arguments. No external installations or native Node modules are required.
 
 ### Native image fallback
 
@@ -95,7 +96,7 @@ Multi-image files use the first still frame. Windows slideshows use the current 
 
 ### Image-processing bounds
 
-Source admission is shared across platforms: 256 MP by default, configurable to 1–512 MP, at most 2 GiB, and at most 65,535 pixels per edge. `src/image/policy.ts` owns the policy; bounded signature/header inspection rejects excessive JPEG/PNG dimensions before raster allocation. Windows and macOS also check native-format dimensions inside their adapters. The configured limit participates in cache identity and admission is checked before cache reuse.
+Source admission is shared across platforms: 256 MP by default, configurable to 1–512 MP, at most 2 GiB, and at most 65,500 pixels per edge (libjpeg's guarded maximum). `src/image/policy.ts` owns the policy; bounded signature/header inspection rejects excessive JPEG/PNG dimensions before raster allocation. Windows and macOS also check native-format dimensions inside their adapters. The configured limit participates in cache identity. Source reads are preflighted before cache reuse; frozen palettes can be reused without reopening the source.
 
 Windows/macOS normalize through their native adapters; Linux uses the bundled WASM adapter built from libjpeg-turbo, libpng, and zlib. The portable adapter is also selectable for development profiling on Windows/macOS. Source files are read directly from disk; full compressed sources do not travel through worker messages. The parent serializes normalization and owns cancellation/cleanup. Portable jobs use a fresh worker and WASM instance, with reduced JPEG decoding and row/pass-based PNG thumbnail accumulation. Progressive JPEG coefficient storage can still grow with source pixels.
 

@@ -2,6 +2,7 @@
 .github/**
 .cache/**
 profiling-results/**
+dist/profile-job.js
 .vscode-test/**
 out/**
 node_modules/**

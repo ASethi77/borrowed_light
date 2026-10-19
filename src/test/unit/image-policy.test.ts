@@ -15,7 +15,8 @@ test('source policy has identical exact boundaries and validates configuration',
     checkDimensions(16000, 16000, imagePolicy());
     assert.throws(() => checkDimensions(16001, 16000, imagePolicy()), /256 megapixel/);
     assert.throws(() => checkDimensions(32001, 16000, imagePolicy(512)), /512 megapixel/);
-    assert.throws(() => checkDimensions(65536, 1, imagePolicy(512)), /edge/);
+    checkDimensions(65500, 1, imagePolicy(512));
+    assert.throws(() => checkDimensions(65501, 1, imagePolicy(512)), /edge/);
     assert.throws(() => checkDimensions(0, 1, imagePolicy()), /dimensions/);
 });
 

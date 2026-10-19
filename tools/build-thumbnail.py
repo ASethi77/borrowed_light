@@ -1,4 +1,4 @@
-"""Rebuild the bundled, OS-independent thumbnail codec (Python 3.10+, CMake, Ninja, Emscripten 4.0.20)."""
+"""Rebuild the bundled, OS-independent thumbnail codec (Python 3.13+, CMake, Ninja, Emscripten 4.0.20)."""
 import argparse
 import hashlib
 import json
@@ -65,6 +65,8 @@ def main():
          '-sEXPORTED_RUNTIME_METHODS=["UTF8ToString","HEAPU8"]', '-o', output])
     licenses = ROOT / 'codec/licenses'
     licenses.mkdir(exist_ok=True)
+    license_text = (emscripten / 'LICENSE').read_text()
+    (licenses / 'emscripten-LICENSE').write_text('\n'.join(line.rstrip() for line in license_text.splitlines()).rstrip() + '\n')
     for source, candidates in [('jpeg', ['LICENSE.md', 'README.ijg']), ('png', ['LICENSE']), ('zlib', ['LICENSE'])]:
         for candidate in candidates:
             file = cache / source / candidate

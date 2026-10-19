@@ -146,7 +146,7 @@ try {
     if ($source.Length -gt 2147483648) { throw 'Wallpaper exceeds the 2 GiB input limit' }
     $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create($source, [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnDemand)
     $frame = $decoder.Frames[0]
-    if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or $frame.PixelWidth -gt 65535 -or $frame.PixelHeight -gt 65535) { throw 'Invalid or excessive wallpaper dimensions' }
+    if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or $frame.PixelWidth -gt $request.maxEdge -or $frame.PixelHeight -gt $request.maxEdge) { throw 'Invalid or excessive wallpaper dimensions' }
     if ([long]$frame.PixelWidth * $frame.PixelHeight -gt $request.maxPixels) { throw 'Wallpaper exceeds the configured megapixel input limit' }
     $orientation = 1
     try { $value = $frame.Metadata.GetQuery('/app1/ifd/{ushort=274}'); if ($null -ne $value) { $orientation = [int]$value } } catch { }

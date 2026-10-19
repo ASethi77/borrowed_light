@@ -1,6 +1,7 @@
 /** Source admission and thumbnail allocation are deliberately separate policies. */
 export const sourceByteLimit = 2 * 1024 * 1024 * 1024;
-export const sourceEdgeLimit = 65_535;
+// Match libjpeg's guarded edge bound; the shared megapixel ceiling is independent.
+export const sourceEdgeLimit = 65_500;
 export const thumbnailEdge = 1024;
 export const thumbnailByteLimit = 8 * 1024 * 1024;
 export const imageJobTimeoutMs = 120_000;

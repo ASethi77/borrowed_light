@@ -11,6 +11,8 @@ import { decodePixels } from '../../image/decode';
 import { imagePolicy } from '../../image/policy';
 import { orientPixels } from '../../thumbnail-worker';
 import { runPipeline } from '../../pipeline';
+import { nativeImageDecoder } from '../../platform/os_wallpaper';
+import { extractRepresentativeColors } from '../../color/extraction';
 
 const decoder = () => portableImageDecoder(resolve('dist/thumbnail-worker.js'));
 const signal = () => new AbortController().signal;
@@ -80,4 +82,64 @@ test('all EXIF orientations place distinct pixels correctly', () => {
         assert.equal(result.width, value >= 5 ? 3 : 2);
         assert.deepEqual([...result.data].filter((_byte, index) => index % 4 === 0), expected[value - 1]);
     }
+});
+
+test('native and portable normalized palettes meet common color and region-weight tolerances', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-parity-'));
+    try {
+        const path = join(directory, 'regions.png');
+        const image = new PNG({ width:2048, height:1024 });
+        const colors = [[200,20,20,255],[20,200,20,128],[20,20,200,255]];
+        for (let y=0;y<1024;y++) { for (let x=0;x<2048;x++) { image.data.set(colors[x<1024?0:y<512?1:2], (y*2048+x)*4); } }
+        await writeFile(path, PNG.sync.write(image));
+        const native = nativeImageDecoder();
+        for (const backend of [decoder(), ...(native?[native]:[])]) {
+            await assert.rejects(backend.fromFile!(path, signal(), imagePolicy(1)), /megapixel/);
+            const pixels = decodePixels(await backend.fromFile!(path, signal()));
+            const swatches = extractRepresentativeColors(pixels.data, pixels.width, pixels.height);
+            for (const [index,color] of colors.entries()) {
+                const match = swatches.find(swatch => {
+                    const rgb = [1,3,5].map(offset=>parseInt(swatch.hex.slice(offset,offset+2),16));
+                    return rgb.every((value,channel)=>Math.abs(value-color[channel])<=5);
+                });
+                assert.ok(match, `${backend.id}: region ${index}`);
+                assert.ok(Math.abs(match.weight-[4/7,1/7,2/7][index])<=0.03, `${backend.id}: region weight ${index}`);
+            }
+        }
+    } finally { await rm(directory,{recursive:true,force:true}); }
+});
+
+test('portable codec supports grayscale, palette transparency and 16-bit PNG inputs', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-png-types-'));
+    try {
+        const cases = [
+            { depth:1, type:0, width:2, raw:Buffer.from([0,64]), extra:Buffer.alloc(0), expected:[0,0,0,255,255,255,255,255] },
+            { depth:8, type:3, width:1, raw:Buffer.from([0,0]), extra:Buffer.concat([chunk('PLTE',Buffer.from([34,153,68])),chunk('tRNS',Buffer.from([128]))]), expected:[34,153,68,128] },
+            { depth:16, type:6, width:1, raw:Buffer.from([0,128,128,64,64,32,32,255,255]), extra:Buffer.alloc(0), expected:[128,64,32,255] },
+        ];
+        for (const [index,input] of cases.entries()) {
+            const header = Buffer.alloc(13); header.writeUInt32BE(input.width);header.writeUInt32BE(1,4);header[8]=input.depth;header[9]=input.type;
+            const bytes = Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),input.extra,chunk('IDAT',deflateSync(input.raw)),chunk('IEND',Buffer.alloc(0))]);
+            const path=join(directory,`${index}.png`);await writeFile(path,bytes);
+            assert.deepEqual([...decodePixels(await decoder().fromFile!(path,signal())).data],input.expected);
+        }
+    } finally { await rm(directory,{recursive:true,force:true}); }
+});
+
+test('JPEG EXIF metadata is applied by the packaged portable decoder', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'borrowed-light-exif-'));
+    try {
+        const pixels = Buffer.from([20,20,20,255,50,50,50,255,80,80,80,255,110,110,110,255,140,140,140,255,170,170,170,255]);
+        const bytes = jpeg.encode({ data:pixels,width:2,height:3 },100).data;
+        for (let orientation=1;orientation<=8;orientation++) {
+            const exif = Buffer.alloc(32);exif.write('Exif\0\0',0,'binary');exif.write('II',6);exif.writeUInt16LE(42,8);exif.writeUInt32LE(8,10);
+            exif.writeUInt16LE(1,14);exif.writeUInt16LE(274,16);exif.writeUInt16LE(3,18);exif.writeUInt32LE(1,20);exif.writeUInt16LE(orientation,24);
+            const path=join(directory,`${orientation}.jpg`);
+            await writeFile(path,Buffer.concat([bytes.subarray(0,2),Buffer.from([255,225,0,34]),exif,bytes.subarray(2)]));
+            const result=decodePixels(await decoder().fromFile!(path,signal()));
+            const expected=orientPixels(pixels,2,3,orientation);
+            assert.equal(result.width,expected.width);assert.equal(result.height,expected.height);
+            assert.ok([...result.data].every((value,index)=>Math.abs(value-expected.data[index])<=3));
+        }
+    } finally {await rm(directory,{recursive:true,force:true});}
 });

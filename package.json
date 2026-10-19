@@ -72,7 +72,7 @@
           "maximum": 512,
           "default": 256,
           "scope": "application",
-          "description": "Maximum wallpaper size in megapixels. Lower values reject larger images; this is not a process memory cap. Sources must also fit within 2 GiB and 65,535 pixels per edge."
+          "description": "Maximum wallpaper size in megapixels. Lower values reject larger images; this is not a process memory cap. Sources must also fit within 2 GiB and 65,500 pixels per edge."
         },
         "borrowed-light.harmony": {
           "type": "string",
@@ -238,6 +238,7 @@
     ]
   },
   "scripts": {
+    "profile:images": "npm run compile && node tools/profile-images.cjs",
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
@@ -247,7 +248,7 @@
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src \"tools/*.cjs\"",
     "test": "npm run test:unit && npm run test:host",
     "test:unit": "npm run compile && npm run compile-tests && node --test out/test/unit/*.test.js",
     "test:host": "vscode-test",

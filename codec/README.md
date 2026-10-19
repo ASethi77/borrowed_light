@@ -6,7 +6,7 @@ the small adapter in `thumbnail.c` and the immutable upstream sources recorded i
 are in `licenses/`. There is no runtime installation, network access, native Node
 addon, system codec dependency, or dependency on glibc/musl.
 
-To rebuild, install Python 3.10+, CMake, Ninja, and Emscripten **4.0.20**, then run:
+To rebuild, install Python 3.13+, CMake, Ninja, and Emscripten **4.0.20**, then run:
 
 ```sh
 python tools/build-thumbnail.py --emsdk /path/to/emsdk

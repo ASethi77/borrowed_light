@@ -5,6 +5,14 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      profiling_suite:
+        description: Resource profiling coverage
+        type: choice
+        default: full
+        options: [smoke, full]
+  schedule:
+    - cron: '17 10 * * 1'
 
 permissions:
   contents: read
@@ -61,6 +69,10 @@ jobs:
         if: runner.os == 'Linux'
         run: npm run vsix
 
+      - name: Verify assets and execute the packaged portable decoder
+        if: runner.os == 'Linux'
+        run: python3 tools/verify-vsix.py borrowed-light-*.vsix
+
       - name: Upload VSIX
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -69,3 +81,112 @@ jobs:
           path: borrowed-light-*.vsix
           if-no-files-found: error
           retention-days: 14
+
+  image-profile:
+    name: Image resources (${{ matrix.os }})
+    needs: test-and-package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .cache/image-fixtures
+          key: image-fixtures-v1-${{ runner.os }}-${{ hashFiles('tools/image-fixtures.py', 'tools/profiling-requirements.txt') }}
+      - run: npm ci
+      - name: Install fixture-generation dependencies (development only)
+        run: python -m pip install --target .cache/profiling-python -r tools/profiling-requirements.txt
+      - name: Qualify and measure production decoders
+        shell: bash
+        env:
+          REQUESTED_SUITE: ${{ inputs.profiling_suite }}
+        run: |
+          suite=smoke
+          if [[ "$GITHUB_EVENT_NAME" == schedule || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            suite="${REQUESTED_SUITE:-full}"
+          fi
+          npm run profile:images -- --suite "$suite" --decoder both --output profiling-results/ci
+      - name: Upload resource results, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: image-profile-${{ matrix.os }}
+          path: profiling-results/ci/
+          if-no-files-found: warn
+          retention-days: 30
+
+  image-profile-summary:
+    name: Combined image resource report
+    if: ${{ always() && needs.image-profile.result != 'skipped' }}
+    needs: image-profile
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: image-profile-*
+          path: profiling-results/all
+      - run: node tools/combine-image-reports.cjs profiling-results/all
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: combined-image-resources
+          path: profiling-results/all/combined.*
+          retention-days: 30
+
+  portable-linux:
+    name: Portable codecs (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [node:24-bookworm-slim, node:24-alpine]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Run actual WASM codecs without system image packages
+        run: docker run --rm -v "$PWD:/work" -w /work "${{ matrix.image }}" sh -c 'npm ci && npm run compile && npm run compile-tests && node --test out/test/unit/portable.test.js'
+
+  rebuild-thumbnail:
+    name: Rebuild portable codec
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Install pinned Emscripten toolchain
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git .cache/emsdk
+          git -C .cache/emsdk checkout 3b3963d86a5c97adaf6eaa845cdfe0b811c2f960
+          .cache/emsdk/emsdk install 4.0.20
+          .cache/emsdk/emsdk activate 4.0.20
+      - run: python3 tools/build-thumbnail.py
+      - name: Check deterministic artifact output
+        run: git diff --exit-code -- codec/thumbnail.cjs codec/thumbnail.wasm codec/artifacts.json
+      - run: npm ci
+      - run: npm run compile
+      - run: npm run compile-tests
+      - run: node --test out/test/unit/portable.test.js

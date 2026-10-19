@@ -33,7 +33,7 @@ async function main() {
 	fs.mkdirSync('dist/codec', { recursive: true });
 	fs.cpSync('codec', 'dist/codec', { recursive: true });
 	const ctx = await esbuild.context({
-		entryPoints: ['src/extension.ts', 'src/palette-worker.ts', 'src/thumbnail-worker.ts'],
+		entryPoints: ['src/extension.ts', 'src/palette-worker.ts', 'src/thumbnail-worker.ts', 'src/profile-job.ts'],
 		bundle: true,
 		format: 'cjs',
 		minify: production,

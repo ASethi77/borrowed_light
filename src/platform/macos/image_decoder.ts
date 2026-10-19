@@ -14,8 +14,10 @@ export function macosImageDecoder(run: ProcessRunner = runProcess): NativeImageD
         if (signal.aborted) { throw new Error('Platform helper cancelled'); }
         const before = await inspectSource(path, policy);
         const metadata = (await run('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', path], { signal, timeoutMs: 5000 })).toString('utf8');
-        const width = Number(/pixelWidth: *([0-9]+)/.exec(metadata)?.[1]);
-        const height = Number(/pixelHeight: *([0-9]+)/.exec(metadata)?.[1]);
+        // sips prints the literal filename before properties; use the last property
+        // line so a filename containing newlines cannot supply fake dimensions.
+        const width = Number([...metadata.matchAll(/^[ \t]*pixelWidth: *([0-9]+)[ \t]*$/gm)].at(-1)?.[1]);
+        const height = Number([...metadata.matchAll(/^[ \t]*pixelHeight: *([0-9]+)[ \t]*$/gm)].at(-1)?.[1]);
         if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) { throw new Error('macOS cannot read wallpaper dimensions'); }
         checkDimensions(width, height, policy);
         const output = join(directory, 'normalized.png');

@@ -23,6 +23,72 @@ For a terminal-driven watch session:
 npm run watch
 ```
 
+## Image resource qualification
+
+Normal extension builds use the checked-in WASM codec and verify its SHA-256.
+Rebuilding it requires the development toolchain described in [codec/README.md](codec/README.md);
+none of those tools are required by extension users.
+
+For generated large-image fixtures, install Python **3.13** and the pinned,
+development-only Pillow dependency inside the workspace:
+
+```sh
+python -m pip install --target .cache/profiling-python -r tools/profiling-requirements.txt
+npm run profile:images -- --suite smoke --decoder both
+npm run profile:images -- --suite full --decoder both
+npm run profile:images -- --file "path/to/wallpaper.jpg" --decoder both --limit-mp 512
+```
+
+On Windows PowerShell, use `npm.cmd` if script execution policy blocks `npm.ps1`.
+The profiler does not read or change desktop wallpaper settings or apply themes.
+`auto` selects the production backend; `native` and `portable` force a backend;
+`both` compares both on Windows/macOS and explicitly records native unavailability
+on Linux. No corrupt-image fallback is performed.
+
+The smoke suite covers the reference wallpaper's dimensions, 256 MP, 512 MP,
+JPEG/PNG, a progressive JPEG, alpha, a public-domain photograph, and rejection
+above the default 256 MP limit. The full suite adds 8/32/64/128 MP, progressive
+JPEG through 512 MP, panoramas, deterministic noise/gradients, and larger
+photographic derivatives. This is pairwise size/content coverage, not every
+combination. Generated assets live in `.cache/image-fixtures` and stay out of git
+and VSIX packages. Fixture-generation time and memory are excluded from results.
+
+Each measurement starts a fresh Node process and invokes the production pipeline.
+Filesystem caches are uncontrolled. Full coverage defaults to three runs per case
+and a separate 20-sync test in one process; override these with `--runs 1` and
+`--repeats 0`. A source above 256 MP automatically uses an opt-in limit matching
+its size, followed by a default-limit rejection check. An explicit `--limit-mp`
+overrides that suite behavior. Individual-file profiling defaults to 256 MP.
+
+Reports are written as JSON, CSV, HTML, and Markdown under `profiling-results/`;
+use `--output profiling-results/my-run` for a stable destination. JSON includes
+source hashes, effective policy, stage timings, per-process measurements, Node
+high-water RSS, heap/external/array-buffer figures, portable WASM memory,
+per-sync retained memory, logs, environment, codec versions, and git revision.
+Absolute input paths are redacted; the filename remains. Profiling your own file
+does not copy it into the reports or repository.
+
+The collector samples the workload and its descendants every 50 ms. It excludes
+the controller and collector, and does not double-count worker threads as separate
+processes. Linux uses `/proc` and `getconf`; Windows uses a persistent PowerShell
+helper with core process APIs; macOS uses `ps`. Per-process OS high-water values
+are available on Windows/Linux and for the Node process on all platforms. macOS
+helper high-water values are marked unavailable. Helper high-water readings are
+observed while a process is alive and may miss its final peak. Sampled CPU is a lower bound for
+short helpers. Summed RSS may count shared pages repeatedly, and polling can miss
+short peaks. Individual process high-water values are never summed and described
+as simultaneous memory usage. A pixel limit and JS worker heap limit are not RSS
+caps; progressive JPEG can allocate large coefficient arrays.
+
+CI runs smoke qualification on pull requests/pushes and full qualification weekly
+or through **Run workflow → profiling_suite**. Windows/macOS compare native and
+portable paths; Linux exercises the portable backend. Additional Linux container
+tests cover glibc and musl without image packages. CI uploads reports even after
+failures, combines platform reports, and independently rebuilds/verifies WASM.
+Correctness, cleanup, instrumentation errors, and missing-platform reports fail
+CI. Timing and memory are informational initially. Collect at least ten successful
+scheduled baselines before proposing platform-specific regression budgets.
+
 ## Type checks and lint
 
 ```sh

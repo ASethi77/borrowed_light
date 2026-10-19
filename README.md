@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/bc38d629-6a72-4620-b992-29f1d968931e
 | Linux (Generic)  | GNOME                                         | Unsupported, but should work with GNOME |
 | Linux (Generic)  | KDE, Xfce, Cinnamon, MATE, and other desktops | Unsupported       |
 
-Use VS Code **1.128 or later** with a local wallpaper. All platforms support JPEG/PNG sources up to **256 megapixels by default**, configurable to **512 MP** with `borrowed-light.maxImageMegapixels` (also limited to 2 GiB and 65,535 pixels per edge). Linux includes a portable decoder; no image packages need to be installed. See [image-processing bounds](ARCHITECTURE.md#image-processing-bounds) for details.
+Use VS Code **1.128 or later** with a local wallpaper. All platforms support JPEG/PNG sources up to **256 megapixels by default**, configurable to **512 MP** with `borrowed-light.maxImageMegapixels` (also limited to 2 GiB and 65,500 pixels per edge). Linux includes a portable decoder; no image packages need to be installed. See [image-processing bounds](ARCHITECTURE.md#image-processing-bounds) for details.
 
 ## Get started
 
