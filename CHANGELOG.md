@@ -1,8 +1,16 @@
 # Changelog
 
+## 0.0.15
+
+- Add support for ultra-high-resolution images (up to 512 megapixels)
+  - Adds a custom WASM image loader for Linux to support portable image decoding
+    across all distros. Windows and Mac use native OS APIs.
+  - Adds profiling tools and CI reports to ensure performance. An 8k resolution
+    wallpaper takes < 1s to process on my budget laptop.
+
 ## 0.0.14
 
-Documentation updates.
+- Documentation updates.
 
 ## 0.0.13
 
