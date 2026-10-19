@@ -1,4 +1,5 @@
 import type { Appearance } from '../model';
+import type { ImagePolicy } from '../image/policy';
 
 export interface Wallpaper { uri: string; appearance: Appearance; provider: string }
 export interface Disposable { dispose(): void }
@@ -16,7 +17,7 @@ export interface WallpaperProvider {
  * so worker termination cannot orphan an OS helper. The signal covers the whole job.
  */
 export interface NativeImageDecoder {
-    (bytes: Uint8Array, signal: AbortSignal): Promise<Uint8Array>;
+    (bytes: Uint8Array, signal: AbortSignal, policy?: ImagePolicy): Promise<Uint8Array>;
     /** Normalize directly from a local file without loading a large source into the worker. */
-    fromFile?(path: string, signal: AbortSignal): Promise<Uint8Array>;
+    fromFile?(path: string, signal: AbortSignal, policy?: ImagePolicy): Promise<Uint8Array>;
 }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { stat } from 'node:fs/promises';
+import { inspectSource } from './image/metadata';
+import { imagePolicy } from './image/policy';
 import { ThemeApplication } from './application';
 import { Appearance, harmonies, Harmony, PaletteResult, PreviewVariants, Wallpaper, PrimaryChoices, SyntaxStyle, syntaxStyles, BorderContrast, borderContrasts, BackgroundTint, BackgroundTints, backgroundTints, Swatch } from './model';
 import { Cancelled, runPipeline, runPreviews, runVariant } from './pipeline';
@@ -71,6 +72,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         do { pending = providerUpdate; await pending; } while (pending !== providerUpdate);
         if (disposed) { throw new Cancelled(); }
         const config = settings();
+        const policy = imagePolicy(config.get<number>('maxImageMegapixels', 256));
         const harmony = config.get<Harmony>('harmony', 'analogous');
         if (!harmonies.includes(harmony)) { throw new Error('Unknown harmony setting'); }
         const requestedPrimaries: PrimaryChoices = { dark: config.get('primaryDark', 'automatic'), light: config.get('primaryLight', 'automatic') };
@@ -89,8 +91,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (refreshWallpaper) {
             wallpaper = await provider.current();
             path = wallpaperPath(wallpaper.uri);
-            const metadata = await stat(path);
-            sourceSignature = JSON.stringify([wallpaper.uri, metadata.size, metadata.mtimeMs, metadata.ctimeMs, metadata.ino]);
+            const metadata = await inspectSource(path, policy);
+            sourceSignature = JSON.stringify([wallpaper.uri, ...JSON.parse(metadata.fingerprint)]);
         } else {
             wallpaper = { ...saved!.wallpaper, appearance: requested === 'desktop' ? await provider.appearance() : saved!.wallpaper.appearance };
             sourceSignature = saved!.sourceSignature;
@@ -99,12 +101,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const appearance = requested === 'desktop' ? wallpaper.appearance : requested as Appearance;
         const backgroundTint = tints[appearance];
         const { primaries, reset: resetPrimaries } = wallpaperPrimaries.resolve(sourceSignature, requestedPrimaries);
-        return { wallpaper, path, swatches, harmony, appearance, primaries, resetPrimaries, syntaxStyle, borderContrast, backgroundTint, tints, sourceSignature,
-            signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle, borderContrast, backgroundTint]) };
+        return { wallpaper, path, swatches, harmony, appearance, primaries, resetPrimaries, syntaxStyle, borderContrast, backgroundTint, tints, policy, sourceSignature,
+            signature: JSON.stringify([sourceSignature, harmony, appearance, primaries, syntaxStyle, borderContrast, backgroundTint, policy]) };
     };
     const generate = (source: Awaited<ReturnType<typeof read>>, signal?: AbortSignal) => source.swatches
         ? runVariant(workerPath, source.swatches, source.harmony, source.appearance, source.primaries[source.appearance], signal, source.syntaxStyle, source.borderContrast, source.backgroundTint)
-        : runPipeline(workerPath, source.path!, source.harmony, source.appearance, signal, source.primaries[source.appearance], source.syntaxStyle, undefined, source.borderContrast, source.backgroundTint);
+        : runPipeline(workerPath, source.path!, source.harmony, source.appearance, signal, source.primaries[source.appearance], source.syntaxStyle, undefined, source.borderContrast, source.backgroundTint, { imagePolicy: source.policy });
 
     const sync = async (manual: boolean, bootstrap = false, preferences = false): Promise<void> => {
         if (disposed || preview || previewOpening || (!manual && ((!automaticEnabled() && !preferences) || (!bootstrap && !application.ownedThemeActive)))) { return; }
@@ -188,7 +190,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 // Selecting a contributed theme does not update our appearance preference.
                 // Keep rule/primary previews in the currently visible mode until explicitly toggled.
                 const appearance = application.active === themeNames.light ? 'light' : application.active === themeNames.dark ? 'dark' : source.appearance;
-                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path, swatches: source.swatches }, signal, source.primaries, source.syntaxStyle, undefined, source.borderContrast, source.tints);
+                variants = await runPreviews(workerPath, cached?.signature === source.signature ? { swatches: cached.result.swatches } : { path: source.path, swatches: source.swatches }, signal, source.primaries, source.syntaxStyle, undefined, source.borderContrast, source.tints, { imagePolicy: source.policy });
                 return { variants, harmony: source.harmony, appearance, primaries: source.primaries, syntaxStyle: source.syntaxStyle, borderContrast: source.borderContrast };
             },
         });

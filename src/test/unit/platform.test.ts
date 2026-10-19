@@ -19,6 +19,7 @@ import { runProcess, ProcessRunner } from '../../platform/process';
 import { wallpaperPath, wallpaperUri } from '../../image/source';
 import { decodePixels } from '../../image/decode';
 import { maxBytes } from '../../image/limits';
+import { imageJobTimeoutMs, thumbnailByteLimit } from '../../image/policy';
 
 const primary = { Left: 0, Top: 0, Right: 1920, Bottom: 1080 };
 const secondary = { Left: -1920, Top: 0, Right: 0, Bottom: 1080 };
@@ -111,10 +112,10 @@ test('native adapters send bytes via stdin with limits and cancellation', async 
     const abort = new AbortController();
     const source = Buffer.from('native image');
     const run: ProcessRunner = async (_executable, _args, options) => {
-        assert.equal(options?.input, source);
+        assert.equal(JSON.parse(Buffer.from(options!.input!).toString()).maxPixels, 256_000_000);
         assert.equal(options?.signal, abort.signal);
-        assert.equal(options?.maxOutputBytes, maxBytes);
-        assert.equal(options?.timeoutMs, 15000);
+        assert.equal(options?.maxOutputBytes, thumbnailByteLimit);
+        assert.equal(options?.timeoutMs, imageJobTimeoutMs);
         return Buffer.from('normalized');
     };
     assert.equal(Buffer.from(await windowsImageDecoder(run)(source, abort.signal)).toString(), 'normalized');

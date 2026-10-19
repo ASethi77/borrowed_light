@@ -66,6 +66,14 @@
     "configuration": {
       "title": "Borrowed Light",
       "properties": {
+        "borrowed-light.maxImageMegapixels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512,
+          "default": 256,
+          "scope": "application",
+          "description": "Maximum wallpaper size in megapixels. Lower values reject larger images; this is not a process memory cap. Sources must also fit within 2 GiB and 65,535 pixels per edge."
+        },
         "borrowed-light.harmony": {
           "type": "string",
           "enum": [

@@ -131,32 +131,42 @@ namespace BorrowedLight {
 `;
 
 /** WPF's on-demand WIC decoder exposes dimensions before CopyPixels/PNG encoding.
- * Consume source bytes on stdin; write ONLY PNG bytes on stdout (no path interpolation).
+ * Read a JSON request on stdin; write ONLY PNG bytes on stdout (no path interpolation).
  * https://learn.microsoft.com/dotnet/api/system.windows.media.imaging.bitmapdecoder.create
  */
 export const imageScript = String.raw`
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
 try {
     Add-Type -AssemblyName PresentationCore, WindowsBase
-    $inputStream = [Console]::OpenStandardInput()
-    $source = New-Object System.IO.MemoryStream
-    $inputStream.CopyTo($source)
-    if ($source.Length -gt 67108864) { throw 'Wallpaper exceeds the 64 MiB input limit' }
-    $source.Position = 0
+    $request = [Console]::In.ReadToEnd() | ConvertFrom-Json
+    if ($request.maxPixels -lt 1000000 -or $request.maxPixels -gt 512000000) { throw 'Invalid image limit' }
+    $source = [System.IO.File]::OpenRead($request.path)
+    if ($source.Length -gt 2147483648) { throw 'Wallpaper exceeds the 2 GiB input limit' }
     $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create($source, [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnDemand)
     $frame = $decoder.Frames[0]
-    if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or [long]$frame.PixelWidth * $frame.PixelHeight -gt 32000000) { throw 'Wallpaper exceeds the 32 megapixel limit' }
+    if ($frame.PixelWidth -lt 1 -or $frame.PixelHeight -lt 1 -or $frame.PixelWidth -gt 65535 -or $frame.PixelHeight -gt 65535) { throw 'Invalid or excessive wallpaper dimensions' }
+    if ([long]$frame.PixelWidth * $frame.PixelHeight -gt $request.maxPixels) { throw 'Wallpaper exceeds the configured megapixel input limit' }
+    $orientation = 1
+    try { $value = $frame.Metadata.GetQuery('/app1/ifd/{ushort=274}'); if ($null -ne $value) { $orientation = [int]$value } } catch { }
     $scale = 1024.0 / [Math]::Max($frame.PixelWidth, $frame.PixelHeight)
     if ($scale -lt 1) {
         $transform = New-Object System.Windows.Media.ScaleTransform($scale, $scale)
         $frame = New-Object System.Windows.Media.Imaging.TransformedBitmap($frame, $transform)
     }
+    if ($orientation -ge 2 -and $orientation -le 8) {
+        $group = New-Object System.Windows.Media.TransformGroup
+        if ($orientation -in 2,4,5,7) { $group.Children.Add((New-Object System.Windows.Media.ScaleTransform(-1,1))) }
+        $angle = switch ($orientation) { 3 {180} 4 {180} 5 {270} 6 {90} 7 {90} 8 {270} default {0} }
+        if ($angle) { $group.Children.Add((New-Object System.Windows.Media.RotateTransform($angle))) }
+        $frame = New-Object System.Windows.Media.Imaging.TransformedBitmap($frame, $group)
+    }
     $encoder = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
     $encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($frame))
     $output = New-Object System.IO.MemoryStream
     $encoder.Save($output)
-    if ($output.Length -gt 67108864) { throw 'Normalized wallpaper exceeds the 64 MiB output limit' }
+    if ($output.Length -gt 8388608) { throw 'Normalized wallpaper exceeds the 8 MiB output limit' }
     $output.Position = 0
     $output.CopyTo([Console]::OpenStandardOutput())
     $output.Dispose()
